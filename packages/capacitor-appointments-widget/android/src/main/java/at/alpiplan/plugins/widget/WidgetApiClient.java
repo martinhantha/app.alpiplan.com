@@ -28,13 +28,15 @@ final class WidgetApiClient {
             return new JSONArray();
         }
         long now = System.currentTimeMillis();
-        long horizon = now + WidgetConfig.LOOKAHEAD_DAYS * 24L * 60 * 60 * 1000;
+        long window = WidgetConfig.APPOINTMENT_WINDOW_DAYS * 24L * 60 * 60 * 1000;
+        long from = now - window;
+        long horizon = now + window;
         String query =
             base
                 + "/api/v1/tenants/"
                 + tenantId
                 + "/appointments?from="
-                + java.net.URLEncoder.encode(isoUtc(now), StandardCharsets.UTF_8)
+                + java.net.URLEncoder.encode(isoUtc(from), StandardCharsets.UTF_8)
                 + "&to="
                 + java.net.URLEncoder.encode(isoUtc(horizon), StandardCharsets.UTF_8)
                 + "&status=draft,confirmed&pageSize=200&sort=asc";
@@ -60,19 +62,36 @@ final class WidgetApiClient {
             if (data == null) {
                 return WidgetStore.appointments(context);
             }
+            boolean showTeachers = WidgetStore.showTeachers(context);
             JSONArray widgetRows = new JSONArray();
             for (int i = 0; i < data.length() && widgetRows.length() < WidgetConfig.MAX_APPOINTMENTS; i++) {
                 JSONObject item = data.optJSONObject(i);
-                if (item == null) {
+                if (item == null || !isVisibleAppointment(item, now)) {
                     continue;
                 }
-                widgetRows.put(toWidgetRow(item));
+                widgetRows.put(toWidgetRow(item, showTeachers));
             }
             WidgetStore.replaceAppointments(context, widgetRows);
             return widgetRows;
         } catch (Exception exception) {
             Log.w(TAG, "fetch upcoming failed", exception);
             return WidgetStore.appointments(context);
+        }
+    }
+
+    private static boolean isVisibleAppointment(JSONObject item, long now) {
+        String status = item.optString("status", "");
+        if (!"draft".equals(status) && !"confirmed".equals(status)) {
+            return false;
+        }
+        if ("confirmed".equals(status)) {
+            return true;
+        }
+        try {
+            return java.time.Instant.parse(item.optString("startsAt")).toEpochMilli() >= now;
+        } catch (java.time.format.DateTimeParseException exception) {
+            Log.w(TAG, "skipping appointment with invalid start time");
+            return false;
         }
     }
 
@@ -109,7 +128,7 @@ final class WidgetApiClient {
         }
     }
 
-    private static JSONObject toWidgetRow(JSONObject item) throws org.json.JSONException {
+    private static JSONObject toWidgetRow(JSONObject item, boolean showTeachers) throws org.json.JSONException {
         JSONObject row = new JSONObject();
         row.put("id", item.optString("id"));
         row.put("version", item.optInt("version", 1));
@@ -118,7 +137,35 @@ final class WidgetApiClient {
         row.put("title", resolveTitle(item));
         row.put("phone", resolvePhone(item));
         row.put("timeLabel", formatTimeLabel(item.optString("startsAt")));
+        if (showTeachers) {
+            row.put("teachers", resolveTeachers(item));
+        }
         return row;
+    }
+
+    private static String resolveTeachers(JSONObject item) {
+        StringBuilder names = new StringBuilder();
+        JSONArray teachers = item.optJSONArray("teachers");
+        if (teachers != null) {
+            for (int i = 0; i < teachers.length(); i++) {
+                JSONObject teacher = teachers.optJSONObject(i);
+                String name = teacher == null ? "" : teacher.optString("displayName", "").trim();
+                if (name.isEmpty()) {
+                    continue;
+                }
+                if (names.length() > 0) {
+                    names.append(", ");
+                }
+                names.append(name);
+            }
+        }
+        if (names.length() == 0) {
+            JSONObject teacher = item.optJSONObject("teacher");
+            if (teacher != null) {
+                names.append(teacher.optString("displayName", "").trim());
+            }
+        }
+        return names.toString();
     }
 
     private static String resolveTitle(JSONObject item) {

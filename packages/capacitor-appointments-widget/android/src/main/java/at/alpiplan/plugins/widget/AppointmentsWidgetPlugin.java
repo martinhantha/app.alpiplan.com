@@ -30,7 +30,9 @@ public class AppointmentsWidgetPlugin extends Plugin {
         boolean darkMode = call.getBoolean("darkMode", false);
         String whatsAppApp = call.getString("whatsAppApp", "whatsapp");
         String uiScale = call.getString("uiScale", "small");
-        WidgetStore.save(getContext(), tenantId, base, cookies, serialized.toString(), darkMode, whatsAppApp, uiScale);
+        boolean showTeachers = call.getBoolean("showTeachers", false);
+        WidgetStore.save(
+            getContext(), tenantId, base, cookies, serialized.toString(), darkMode, whatsAppApp, uiScale, showTeachers);
         AppointmentsWidgetProvider.requestUpdateAll(getContext());
         call.resolve();
     }

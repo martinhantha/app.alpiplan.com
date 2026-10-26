@@ -34,11 +34,16 @@ public class AppointmentsWidgetProvider extends AppWidgetProvider {
     @Override
     public void onUpdate(Context context, AppWidgetManager manager, int[] appWidgetIds) {
         if (WidgetStore.isConfigured(context)) {
+            PendingResult pendingResult = goAsync();
             new Thread(
                     () -> {
-                        WidgetApiClient.fetchUpcoming(context);
-                        for (int appWidgetId : appWidgetIds) {
-                            updateWidget(context, manager, appWidgetId);
+                        try {
+                            WidgetApiClient.fetchUpcoming(context);
+                            for (int appWidgetId : appWidgetIds) {
+                                updateWidget(context, manager, appWidgetId);
+                            }
+                        } finally {
+                            pendingResult.finish();
                         }
                     })
                 .start();

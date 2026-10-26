@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="widget_call">Anrufen</string>
+    <string name="widget_call_compact">Tel</string>
+    <string name="widget_done">✓</string>
+    <string name="widget_empty">Keine anstehenden Termine</string>
+    <string name="widget_login">Alpiplan öffnen und anmelden</string>
+    <string name="widget_name">Alpiplan Termine</string>
+    <string name="widget_refresh">Aktualisieren</string>
+    <string name="widget_refresh_compact">↻</string>
+    <string name="widget_title">Nächste Termine</string>
+    <string name="widget_whatsapp">WA</string>
+</resources>

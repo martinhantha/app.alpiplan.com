@@ -29,7 +29,9 @@ final class WidgetUiBinder {
                 continue;
             }
             views.setViewVisibility(ids.row, View.VISIBLE);
-            views.setTextViewText(ids.time, item.optString("timeLabel", ""));
+            String timeLabel = item.optString("timeLabel", "");
+            String teachers = item.optString("teachers", "").trim();
+            views.setTextViewText(ids.time, teachers.isEmpty() ? timeLabel : timeLabel + " · " + teachers);
             views.setTextViewText(ids.title, item.optString("title", "Termin"));
             views.setTextViewText(ids.call, callLabel);
 

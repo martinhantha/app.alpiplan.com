@@ -7,6 +7,8 @@ export interface WidgetAppointmentPayload {
   phone: string | null;
   /** Pre-formatted time/date label for the widget row */
   timeLabel: string;
+  /** Comma-separated teacher (pilot) names, only sent for accounts that plan all appointments */
+  teachers?: string | null;
 }
 
 export type WidgetWhatsAppApp = "whatsapp" | "business";
@@ -22,6 +24,8 @@ export interface AppointmentsWidgetSyncOptions {
   whatsAppApp?: WidgetWhatsAppApp;
   /** Account display size — scales widget type (small | medium | large). */
   uiScale?: "small" | "medium" | "large";
+  /** Show teacher (pilot) names on rows, also for native background refreshes. */
+  showTeachers?: boolean;
 }
 
 export interface AppointmentsWidgetPlugin {
