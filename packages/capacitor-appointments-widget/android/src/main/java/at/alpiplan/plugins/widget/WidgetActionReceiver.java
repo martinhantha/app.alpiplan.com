@@ -107,16 +107,21 @@ public class WidgetActionReceiver extends BroadcastReceiver {
 
     private void refreshAsync(Context context) {
         Context app = context.getApplicationContext();
+        PendingResult pendingResult = goAsync();
         new Thread(
                 () -> {
-                    if (WidgetStore.isConfigured(app)) {
-                        WidgetApiClient.fetchUpcoming(app);
-                    }
-                    AppWidgetManager manager = AppWidgetManager.getInstance(app);
-                    ComponentName component = new ComponentName(app, AppointmentsWidgetProvider.class);
-                    int[] ids = manager.getAppWidgetIds(component);
-                    for (int id : ids) {
-                        AppointmentsWidgetProvider.updateWidget(app, manager, id);
+                    try {
+                        if (WidgetStore.isConfigured(app)) {
+                            WidgetApiClient.fetchUpcoming(app);
+                        }
+                        AppWidgetManager manager = AppWidgetManager.getInstance(app);
+                        ComponentName component = new ComponentName(app, AppointmentsWidgetProvider.class);
+                        int[] ids = manager.getAppWidgetIds(component);
+                        for (int id : ids) {
+                            AppointmentsWidgetProvider.updateWidget(app, manager, id);
+                        }
+                    } finally {
+                        pendingResult.finish();
                     }
                 })
             .start();

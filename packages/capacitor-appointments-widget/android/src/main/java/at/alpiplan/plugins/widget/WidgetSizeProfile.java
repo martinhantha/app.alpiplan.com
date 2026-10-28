@@ -47,7 +47,11 @@ final class WidgetSizeProfile {
             Bundle options = manager.getAppWidgetOptions(appWidgetId);
             if (options != null) {
                 widthDp = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, widthDp);
-                heightDp = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, heightDp);
+                int maxHeightDp = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, -1);
+                heightDp =
+                    maxHeightDp > 0
+                        ? maxHeightDp
+                        : options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, heightDp);
             }
         }
         return fromDimensions(widthDp, heightDp, textScaleFactor(context));
@@ -71,9 +75,13 @@ final class WidgetSizeProfile {
         if (heightDp <= 125 || (widthDp <= 200 && heightDp <= 150)) {
             base = new WidgetSizeProfile(1, 12f, 10f, 11f, 9f, 11f, 9f, 6, true);
         } else if (heightDp <= 195 || widthDp <= 220) {
-            base = new WidgetSizeProfile(2, 13f, 10f, 12f, 10f, 12f, 9f, 7, true);
+            int rowHeightDp = Math.round(24 * Math.max(1f, textScale));
+            int visibleRows = Math.min(WidgetConfig.VISIBLE_ROWS, Math.max(2, (heightDp - 55) / rowHeightDp));
+            base = new WidgetSizeProfile(visibleRows, 13f, 10f, 12f, 10f, 12f, 9f, 7, true);
         } else {
-            base = new WidgetSizeProfile(WidgetConfig.VISIBLE_ROWS, 14f, 11f, 13f, 11f, 13f, 10f, 8, false);
+            int rowHeightDp = Math.round(27 * Math.max(1f, textScale));
+            int visibleRows = Math.min(WidgetConfig.VISIBLE_ROWS, Math.max(3, (heightDp - 80) / rowHeightDp));
+            base = new WidgetSizeProfile(visibleRows, 14f, 11f, 13f, 11f, 13f, 10f, 8, false);
         }
         return base.scaled(textScale);
     }

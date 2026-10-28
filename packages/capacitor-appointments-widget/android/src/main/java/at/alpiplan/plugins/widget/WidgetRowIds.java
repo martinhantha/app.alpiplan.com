@@ -40,5 +40,26 @@ final class WidgetRowIds {
                 R.id.item_call_2,
                 R.id.item_whatsapp_2,
                 R.id.item_complete_2),
+            new WidgetRowIds(
+                R.id.widget_row_3,
+                R.id.item_time_3,
+                R.id.item_title_3,
+                R.id.item_call_3,
+                R.id.item_whatsapp_3,
+                R.id.item_complete_3),
+            new WidgetRowIds(
+                R.id.widget_row_4,
+                R.id.item_time_4,
+                R.id.item_title_4,
+                R.id.item_call_4,
+                R.id.item_whatsapp_4,
+                R.id.item_complete_4),
+            new WidgetRowIds(
+                R.id.widget_row_5,
+                R.id.item_time_5,
+                R.id.item_title_5,
+                R.id.item_call_5,
+                R.id.item_whatsapp_5,
+                R.id.item_complete_5),
         };
 }

@@ -2,14 +2,18 @@ import { Capacitor } from "@capacitor/core";
 import { AppointmentsWidget, type WidgetAppointmentPayload } from "@alpiplan/capacitor-appointments-widget";
 import { $fetch } from "ofetch";
 import { APPOINTMENT_LIVE_EVENT } from "~/types/live-events";
-import { resolveAppointmentDisplayName, resolveAppointmentPhone } from "~/utils/appointment-contact";
+import {
+  formatAppointmentTeachers,
+  resolveAppointmentDisplayName,
+  resolveAppointmentPhone,
+} from "~/utils/appointment-contact";
 import { readWhatsAppApp } from "~/utils/whatsapp";
 import { normalizeUiScale } from "~/utils/ui-scale";
 
-/** Must cover far-future bookings (e.g. 3+ weeks). */
-const LOOKAHEAD_MS = 120 * 24 * 60 * 60 * 1000;
+/** Bound the sync window while including past confirmed and far-future bookings. */
+const APPOINTMENT_WINDOW_MS = 120 * 24 * 60 * 60 * 1000;
 const POLL_MS = 5 * 60_000;
-const MAX_WIDGET_ITEMS = 3;
+const MAX_WIDGET_ITEMS = 10;
 
 interface AppointmentListItem {
   id: string;
@@ -19,6 +23,8 @@ interface AppointmentListItem {
   appointmentContactText: string | null;
   appointmentPhoneRaw: string | null;
   appointmentPhoneE164: string | null;
+  teacher: { id: string; displayName: string } | null;
+  teachers?: { id: string; displayName: string }[] | null;
   customer: {
     displayName: string | null;
     phones?: { e164: string | null; raw: string | null; isPrimary: boolean }[];
@@ -39,7 +45,11 @@ function formatTimeLabel(startsAt: string) {
   }
 }
 
-function toWidgetPayload(item: AppointmentListItem, tenantName?: string | null): WidgetAppointmentPayload {
+function toWidgetPayload(
+  item: AppointmentListItem,
+  tenantName: string | null | undefined,
+  showTeachers: boolean,
+): WidgetAppointmentPayload {
   return {
     id: item.id,
     version: item.version,
@@ -48,11 +58,12 @@ function toWidgetPayload(item: AppointmentListItem, tenantName?: string | null):
     title: resolveAppointmentDisplayName(item, tenantName),
     phone: resolveAppointmentPhone(item),
     timeLabel: formatTimeLabel(item.startsAt),
+    teachers: showTeachers ? formatAppointmentTeachers(item) : null,
   };
 }
 
 export function useAndroidAppointmentsWidget() {
-  const { user, primaryTenant } = useAuth();
+  const { user, primaryTenant, canPlanAllAppointments } = useAuth();
   const colorMode = useColorMode();
 
   const enabled = computed(
@@ -79,20 +90,21 @@ export function useAndroidAppointmentsWidget() {
         {
           credentials: "include",
           query: {
-            from: new Date(now).toISOString(),
-            to: new Date(now + LOOKAHEAD_MS).toISOString(),
+            from: new Date(now - APPOINTMENT_WINDOW_MS).toISOString(),
+            to: new Date(now + APPOINTMENT_WINDOW_MS).toISOString(),
             status: "draft,confirmed",
             pageSize: 200,
             sort: "asc",
           },
         },
       );
+      const showTeachers = canPlanAllAppointments.value;
       const items = response.data
         .filter((item) => item.status !== "cancelled" && item.status !== "completed")
-        .filter((item) => new Date(item.startsAt).getTime() >= now)
+        .filter((item) => item.status === "confirmed" || new Date(item.startsAt).getTime() >= now)
         .sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime())
         .slice(0, MAX_WIDGET_ITEMS)
-        .map((item) => toWidgetPayload(item, primaryTenant.value?.tenantName));
+        .map((item) => toWidgetPayload(item, primaryTenant.value?.tenantName, showTeachers));
 
       await AppointmentsWidget.sync({
         tenantId,
@@ -101,6 +113,7 @@ export function useAndroidAppointmentsWidget() {
         darkMode: colorMode.value === "dark",
         whatsAppApp: readWhatsAppApp(),
         uiScale: normalizeUiScale(user.value?.uiScale),
+        showTeachers,
       });
     } catch {
       // Keep last widget snapshot if refresh fails offline.
@@ -122,7 +135,14 @@ export function useAndroidAppointmentsWidget() {
   }
 
   watch(
-    () => [user.value?.id, primaryTenant.value?.tenantId, user.value?.uiScale, colorMode.value] as const,
+    () =>
+      [
+        user.value?.id,
+        primaryTenant.value?.tenantId,
+        user.value?.uiScale,
+        colorMode.value,
+        canPlanAllAppointments.value,
+      ] as const,
     () => {
       if (!user.value) void clearWidget();
       else void syncWidget();

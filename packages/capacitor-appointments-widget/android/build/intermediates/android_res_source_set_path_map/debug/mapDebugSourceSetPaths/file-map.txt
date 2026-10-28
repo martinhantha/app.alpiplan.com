@@ -7,4 +7,4 @@ at.alpiplan.plugins.widget.alpiplan-capacitor-appointments-widget-debug-5 /Users
 at.alpiplan.plugins.widget.alpiplan-capacitor-appointments-widget-debug-6 /Users/martin.stofner/WSN/alpiplan/apps/mobile-shell/node_modules/@alpiplan/capacitor-appointments-widget/android/build/intermediates/packaged_res/debug/packageDebugResources
 at.alpiplan.plugins.widget.alpiplan-capacitor-appointments-widget-debug-7 /Users/martin.stofner/WSN/alpiplan/apps/mobile-shell/node_modules/@alpiplan/capacitor-appointments-widget/android/src/debug/res
 at.alpiplan.plugins.widget.alpiplan-capacitor-appointments-widget-main-8 /Users/martin.stofner/WSN/alpiplan/apps/mobile-shell/node_modules/@alpiplan/capacitor-appointments-widget/android/src/main/res
-gradleHome-0 /private/var/folders/0w/wsbqblln6mv4js3kc9lzfv7h0000gp/T/cursor-sandbox-cache/79d65030a99bbf253f35e0470c84d84c/gradle
+gradleHome-0 /Users/martin.stofner/.gradle
