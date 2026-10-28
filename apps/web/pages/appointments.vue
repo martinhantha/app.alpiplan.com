@@ -915,7 +915,7 @@ function timelineMenuItems(appointment: AppointmentListItem): DropdownMenuItem[]
       },
     ]);
   }
-  if (canManageTenant.value) {
+  if (canAccessWorkspace.value) {
     groups.push([
       { label: t("appointments.delete"), icon: "i-lucide-trash-2", color: "error", onSelect: () => deleteAppointment(appointment) },
     ]);
@@ -1480,7 +1480,7 @@ watch(
               :show-edit="canAccessWorkspace"
               :show-duplicate="canAccessWorkspace"
               :show-complete="canAccessWorkspace"
-              :show-delete="canManageTenant"
+              :show-delete="canAccessWorkspace"
               @edit="openEditAppointment(appointment)"
               @duplicate="openDuplicateAppointment(appointment)"
               @complete="markCompleted(appointment)"
@@ -1770,7 +1770,7 @@ watch(
                     :show-edit="canAccessWorkspace"
                     :show-duplicate="canAccessWorkspace"
                     :show-complete="canAccessWorkspace"
-                    :show-delete="canManageTenant"
+                    :show-delete="canAccessWorkspace"
                     @edit="openEditAppointment(appointment)"
                     @duplicate="openDuplicateAppointment(appointment)"
                     @complete="markCompleted(appointment)"

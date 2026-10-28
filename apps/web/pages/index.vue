@@ -458,7 +458,7 @@ async function deleteAppointment(appointment: AppointmentListItem) {
                 :show-edit="canAccessWorkspace"
                 :show-duplicate="canAccessWorkspace"
                 :show-complete="canAccessWorkspace"
-                :show-delete="canManageTenant"
+                :show-delete="canAccessWorkspace"
                 @edit="openEditAppointment(appointment)"
                 @duplicate="openDuplicateAppointment(appointment)"
                 @complete="markCompleted(appointment)"
