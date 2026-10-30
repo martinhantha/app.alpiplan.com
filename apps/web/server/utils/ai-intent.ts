@@ -1,6 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, ThinkingLevel, type ThinkingConfig } from "@google/genai";
 import { z } from "zod";
 
 /**
@@ -16,7 +16,9 @@ export type AiProvider = "anthropic" | "gemini";
 
 const DEFAULT_MODELS: Record<AiProvider, string> = {
   anthropic: "claude-haiku-5-5",
-  gemini: "gemini-2.5-flash",
+  // Alias maintained by Google; survives model retirements (gemini-2.5-flash was closed for new accounts).
+  // Lite answered in ~1 s during testing (2026-10-30); gemini-flash-latest took 34 s or was overloaded.
+  gemini: "gemini-flash-lite-latest",
 };
 
 function hasKey(name: string): boolean {
@@ -125,7 +127,8 @@ function buildSystemPrompt(catalog: AiIntentCatalog): string {
     "- time: only when a concrete clock time is said: 'um 14 Uhr' -> 14:00, 'halb drei' -> 14:30, 'viertel vor zehn' -> 09:45,",
     "  '9.30' -> 09:30, 'alle 15' -> 15:00. Vague parts of day (früh, vormittags, nachmittags, abends) stay null; mention them in note.",
     "  Ambiguous 12-hour times default to daytime business hours (e.g. 'um 3' -> 15:00, 'um 9' -> 09:00).",
-    "- durationMinutes: '2h', '2 Stunden', 'anderthalb Stunden' -> 90, '45 min'. Null if absent.",
+    "- durationMinutes: '2h', '2 Stunden', 'anderthalb Stunden' -> 90, '45 min'. Null if absent; never copy a default",
+    "  duration from the appointment-type list. resourceName only when the resource itself is named in the text.",
     "- phone: keep digits, convert 'plus' to '+', remove spaces/dashes. Null if absent.",
     "- note: short leftover info (wishes, remarks, vague times). Do not repeat fields you already extracted. Null if empty.",
     "- Never invent data. Null means not mentioned.",
@@ -149,7 +152,8 @@ function buildUserPrompt(text: string, now: Date, timeZone: string): string {
   return `Current date: ${date} (${weekday}), current time ${time}, time zone ${timeZone}.\n\nText:\n${text}`;
 }
 
-const TIMEOUT_MS = 12_000;
+/** Hard limit per model call; the rule parser answers when it is exceeded. */
+const TIMEOUT_MS = Math.max(3_000, Number(process.env.AI_INTENT_TIMEOUT_MS) || 20_000);
 
 let anthropicClient: Anthropic | null = null;
 function getAnthropic(): Anthropic {
@@ -157,6 +161,17 @@ function getAnthropic(): Anthropic {
     anthropicClient = new Anthropic({ timeout: TIMEOUT_MS, maxRetries: 1 });
   }
   return anthropicClient;
+}
+
+/** Minimal thinking keeps latency low for a plain extraction. Gemini 2.5 uses budgets, 3.x uses levels. */
+function geminiThinkingConfig(model: string): ThinkingConfig | undefined {
+  if (/^gemini-2\.5-/.test(model)) return model.includes("flash") ? { thinkingBudget: 0 } : undefined;
+  return { thinkingLevel: ThinkingLevel.MINIMAL };
+}
+
+function isGeminiBadRequest(error: unknown): boolean {
+  const status = (error as { status?: number; code?: number })?.status ?? (error as { code?: number })?.code;
+  return status === 400 || /INVALID_ARGUMENT|thinking/i.test(String((error as Error)?.message ?? ""));
 }
 
 let geminiClient: GoogleGenAI | null = null;
@@ -200,18 +215,26 @@ async function extractWithGemini(
   systemPrompt: string,
   userPrompt: string,
 ): Promise<Omit<AiIntentResult, "provider" | "model" | "latencyMs">> {
-  const response = await getGemini().models.generateContent({
-    model,
-    contents: userPrompt,
-    config: {
-      systemInstruction: systemPrompt,
-      responseMimeType: "application/json",
-      responseJsonSchema: EXTRACTION_JSON_SCHEMA,
-      temperature: 0,
-      // Flash models accept a zero thinking budget; keeps latency low for a simple extraction.
-      ...(model.includes("flash") ? { thinkingConfig: { thinkingBudget: 0 } } : {}),
-    },
-  });
+  const baseConfig = {
+    systemInstruction: systemPrompt,
+    responseMimeType: "application/json",
+    responseJsonSchema: EXTRACTION_JSON_SCHEMA,
+    temperature: 0,
+  };
+  const request = (thinkingConfig: ThinkingConfig | undefined) =>
+    getGemini().models.generateContent({
+      model,
+      contents: userPrompt,
+      config: thinkingConfig ? { ...baseConfig, thinkingConfig } : baseConfig,
+    });
+  let response: Awaited<ReturnType<typeof request>>;
+  try {
+    response = await request(geminiThinkingConfig(model));
+  } catch (error) {
+    // Older/newer models disagree on thinking settings; retry once with the model's defaults.
+    if (!isGeminiBadRequest(error)) throw error;
+    response = await request(undefined);
+  }
   const text = response.text;
   if (!text) {
     const reason = response.candidates?.[0]?.finishReason ?? response.promptFeedback?.blockReason ?? "unknown";
