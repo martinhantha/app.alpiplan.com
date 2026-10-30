@@ -2,8 +2,16 @@ import { getRouterParam, readBody } from "h3";
 import { requireTenantAccess, staffAppointmentScope } from "~/server/utils/authz";
 import { prisma } from "~/server/utils/prisma";
 import { throwValidation } from "~/server/utils/api-errors";
-import { parseAppointmentIntent } from "~/server/utils/parse-intent";
+import {
+  parseAppointmentIntent,
+  resolveExtractedIntent,
+  type IntentCatalog,
+  type ParseIntentResult,
+} from "~/server/utils/parse-intent";
+import { aiIntentModel, extractIntentWithAi, isAiIntentAvailable } from "~/server/utils/ai-intent";
 import { suggestNextPrioritySlot } from "~/server/utils/scheduling";
+
+const TIME_ZONE = "Europe/Rome";
 
 export default defineEventHandler(async (event) => {
   const access = await requireTenantAccess(event, getRouterParam(event, "tenantId"));
@@ -15,6 +23,7 @@ export default defineEventHandler(async (event) => {
   if (!text) {
     throwValidation("Text ist erforderlich", { field: "text" });
   }
+  const answers = body.answers && typeof body.answers === "object" ? body.answers : {};
 
   const scope = await staffAppointmentScope(access);
 
@@ -54,26 +63,76 @@ export default defineEventHandler(async (event) => {
     }),
     prisma.tenant.findUnique({
       where: { id: access.tenant.id },
-      select: { teacherLabel: true },
+      select: { teacherLabel: true, aiParsingEnabled: true, assistantHints: true },
     }),
   ]);
 
-  const result = parseAppointmentIntent(
-    text,
-    {
-      timeZone: "Europe/Rome",
-      teacherLabel: tenant?.teacherLabel?.trim() || "Lehrer",
-      teachers,
-      resources,
-      lessonTypes: lessonTypes.map((item) => ({
-        id: item.id,
-        displayName: item.name,
-        defaultDurationMin: item.defaultDurationMin,
-      })),
-      customers,
-    },
-    body.answers && typeof body.answers === "object" ? body.answers : {},
-  );
+  const now = new Date();
+  const catalog: IntentCatalog = {
+    now,
+    timeZone: TIME_ZONE,
+    teacherLabel: tenant?.teacherLabel?.trim() || "Lehrer",
+    teachers,
+    resources,
+    lessonTypes: lessonTypes.map((item) => ({
+      id: item.id,
+      displayName: item.name,
+      defaultDurationMin: item.defaultDurationMin,
+    })),
+    customers,
+  };
+
+  let result: ParseIntentResult | null = null;
+  let source: "ai" | "rules" = "rules";
+
+  if (tenant?.aiParsingEnabled && isAiIntentAvailable()) {
+    const started = Date.now();
+    try {
+      // Customers are not sent to the model; names come back as text and are matched here.
+      const ai = await extractIntentWithAi(text, {
+        now,
+        timeZone: TIME_ZONE,
+        teacherLabel: catalog.teacherLabel,
+        teachers: teachers.map((item) => item.displayName),
+        lessonTypes: lessonTypes.map((item) => ({ name: item.name, defaultDurationMin: item.defaultDurationMin })),
+        resources: resources.map((item) => item.name),
+        hints: tenant.assistantHints,
+      });
+      result = resolveExtractedIntent({ ...ai.extraction, contactText: text }, catalog, answers);
+      source = "ai";
+      void prisma.assistantUsage
+        .create({
+          data: {
+            tenantId: access.tenant.id,
+            userId: access.actorUserId,
+            model: ai.model,
+            inputTokens: ai.usage.inputTokens,
+            outputTokens: ai.usage.outputTokens,
+            cacheReadTokens: ai.usage.cacheReadTokens,
+            latencyMs: ai.latencyMs,
+            ok: true,
+          },
+        })
+        .catch(() => undefined);
+    } catch (error) {
+      console.error("[assistant] AI parse failed, using rule parser", error);
+      void prisma.assistantUsage
+        .create({
+          data: {
+            tenantId: access.tenant.id,
+            userId: access.actorUserId,
+            model: aiIntentModel(),
+            latencyMs: Date.now() - started,
+            ok: false,
+          },
+        })
+        .catch(() => undefined);
+    }
+  }
+
+  if (!result) {
+    result = parseAppointmentIntent(text, catalog, answers);
+  }
 
   if (scope.forceTeacherId) {
     const ownTeacher = teachers.find((teacher) => teacher.id === scope.forceTeacherId);
@@ -83,7 +142,7 @@ export default defineEventHandler(async (event) => {
   }
 
   if (!result.parsed.time) {
-    const lessonType = lessonTypes.find((item) => item.id === result.parsed.lessonTypeId);
+    const lessonType = lessonTypes.find((item) => item.id === result!.parsed.lessonTypeId);
     const slot = await suggestNextPrioritySlot(access.tenant.id, {
       teacherId: result.parsed.teacherId ?? scope.forceTeacherId ?? undefined,
       resourceId: result.parsed.resourceId,
@@ -115,5 +174,5 @@ export default defineEventHandler(async (event) => {
     }
   }
 
-  return result;
+  return { ...result, source };
 });

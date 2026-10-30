@@ -66,3 +66,7 @@ Audio **nicht** dauerhaft speichern, sofern nicht ausdrücklich erforderlich und
 - [ ] Einwilligungsdialoge für optionale Features
 - [ ] Unterauftragsverzeichnis gepflegt
 - [ ] TOM-Dokumentation
+
+## Ergänzung 2026-10-30: KI-Textauswertung
+
+Wenn ein Mandant die KI-Textauswertung aktiviert, werden die Eingabetexte der Schnellerfassung (inkl. darin enthaltener Namen und Telefonnummern) sowie Lehrer-, Terminart- und Ressourcennamen an die Anthropic-API übertragen. Kundenlisten werden nicht übertragen. **Offen:** Anthropic als Unterauftragsverarbeiter in den AV-Vertrag und die Datenschutzerklärung aufnehmen, bevor die Funktion für Mandanten freigeschaltet wird. API-Daten werden laut Anthropic-Nutzungsbedingungen nicht zum Training verwendet.

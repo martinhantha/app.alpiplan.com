@@ -1,3 +1,5 @@
+import { fold, fuzzyWordEquals } from "./fuzzy-name";
+
 export interface IntentEntity {
   id: string;
   displayName: string;
@@ -102,16 +104,6 @@ const NAME_STOP = new Set([
 const PASSENGER_RE =
   /\b(passa[sgjch]+(?:ier|er|e|in)?|passenger|fluggast|mitfahrer(?:in)?|kunde|kundin|schueler(?:in)?|gast|teilnehmer(?:in)?|namens)\b/i;
 
-function fold(value: string): string {
-  return value
-    .normalize("NFKC")
-    .replace(/ß/g, "ss")
-    .replace(/[äÄ]/g, "ae")
-    .replace(/[öÖ]/g, "oe")
-    .replace(/[üÜ]/g, "ue")
-    .toLowerCase();
-}
-
 function pad(n: number): string {
   return String(n).padStart(2, "0");
 }
@@ -180,12 +172,42 @@ function nameMatches(displayName: string, query: string): boolean {
   return n === q || wordsOf(displayName).includes(q) || n.startsWith(`${q} `) || n.endsWith(` ${q}`);
 }
 
+/** Fuzzy tier: every query word must match some name word, allowing typos and mishearing. */
+function nameMatchesFuzzy(displayName: string, query: string): boolean {
+  const nameWords = wordsOf(displayName);
+  const queryWords = wordsOf(query);
+  if (!queryWords.length || !nameWords.length) return false;
+  return queryWords.every((q) => nameWords.some((n) => fuzzyWordEquals(n, q)));
+}
+
+/**
+ * Exact matches win. Only when there is none, fuzzy matches are returned and
+ * flagged so callers can ask instead of assigning silently.
+ */
+function matchByName<T>(items: T[], query: string, nameOf: (item: T) => string): { items: T[]; fuzzy: boolean } {
+  const exact = items.filter((item) => nameMatches(nameOf(item), query));
+  if (exact.length) return { items: exact, fuzzy: false };
+  return { items: items.filter((item) => nameMatchesFuzzy(nameOf(item), query)), fuzzy: true };
+}
+
+function customerByPhone(catalog: IntentCatalog, phone: string): IntentCustomer | undefined {
+  const hits = catalog.customers.filter((customer) =>
+    (customer.phones ?? []).some((entry) => phonesMatch(phone, entry.e164 || entry.raw || "")),
+  );
+  return hits.length === 1 ? hits[0] : undefined;
+}
+
 function uniqueIds<T extends { id: string }>(items: T[]): T[] {
   const seen = new Set<string>();
   return items.filter((item) => (seen.has(item.id) ? false : (seen.add(item.id), true)));
 }
 
-function findInText<T extends { id: string }>(items: T[], text: string, nameOf: (item: T) => string): T[] {
+function findInText<T extends { id: string }>(
+  items: T[],
+  text: string,
+  nameOf: (item: T) => string,
+  options: { fuzzy?: boolean } = {},
+): T[] {
   const folded = fold(text);
   const hits: T[] = [];
   for (const item of items) {
@@ -197,6 +219,15 @@ function findInText<T extends { id: string }>(items: T[], text: string, nameOf: 
         hits.push(item);
         break;
       }
+    }
+  }
+  // Fuzzy fallback only for non-person catalogs (lesson types, resources): "Tandemflg" -> "Tandemflug".
+  if (!hits.length && options.fuzzy) {
+    const tokens = folded.split(/[^a-z0-9]+/).filter((t) => t.length >= 4 && !STOP.has(t) && !NAME_STOP.has(t));
+    for (const item of items) {
+      const first = wordsOf(nameOf(item))[0];
+      if (!first || first.length < 4) continue;
+      if (tokens.some((token) => fuzzyWordEquals(token, first))) hits.push(item);
     }
   }
   return uniqueIds(hits);
@@ -404,34 +435,30 @@ function resolveCustomer(
   }
 
   if (parsed.phone && !parsed.customerId && !parsed.customerName) {
-    const byPhone = catalog.customers.filter((customer) =>
-      (customer.phones ?? []).some((phone) => phonesMatch(parsed.phone!, phone.e164 || phone.raw || "")),
-    );
-    if (byPhone.length === 1) {
-      parsed.customerId = byPhone[0].id;
-      parsed.customerName = byPhone[0].displayName;
+    const byPhone = customerByPhone(catalog, parsed.phone);
+    if (byPhone) {
+      parsed.customerId = byPhone.id;
+      parsed.customerName = byPhone.displayName;
       parsed.createCustomer = false;
       fieldConfidence.customerId = 0.9;
     }
   }
 
   if (parsed.customerName) {
-    const hits = catalog.customers.filter((customer) => nameMatches(customer.displayName, parsed.customerName!));
-    if (hits.length === 1) {
+    const { items: hits, fuzzy } = matchByName(catalog.customers, parsed.customerName, (customer) => customer.displayName);
+    if (hits.length === 1 && !fuzzy) {
       parsed.customerId = hits[0].id;
       parsed.customerName = hits[0].displayName;
       parsed.createCustomer = false;
       fieldConfidence.customerId = 0.9;
       rest = stripName(rest, hits[0].displayName);
-    } else if (hits.length > 1) {
-      questions.push({
-        id: "customer",
-        prompt: `Welcher Passagier „${parsed.customerName}“ ist gemeint?`,
-        options: [
-          ...hits.slice(0, 4).map((item) => ({ value: item.id, label: item.displayName })),
-          { value: "new", label: `Neu anlegen: ${parsed.customerName}` },
-        ],
-      });
+    } else if (hits.length >= 1) {
+      // Similar names (typo, mishearing) are never assigned silently: ask, default to a new customer.
+      if (fuzzy) {
+        parsed.createCustomer = true;
+        fieldConfidence.customerId = 0.6;
+      }
+      questions.push(customerQuestion(parsed.customerName, hits, fuzzy));
     } else {
       parsed.createCustomer = true;
       parsed.customerId = undefined;
@@ -445,6 +472,203 @@ function resolveCustomer(
 function dropQuestion(questions: ClarifyingQuestion[], id: string) {
   const index = questions.findIndex((q) => q.id === id);
   if (index >= 0) questions.splice(index, 1);
+}
+
+function customerQuestion(name: string, hits: IntentCustomer[], fuzzy: boolean): ClarifyingQuestion {
+  return {
+    id: "customer",
+    prompt: fuzzy ? `Ist „${name}“ ein bestehender Passagier?` : `Welcher Passagier „${name}“ ist gemeint?`,
+    options: [
+      ...hits.slice(0, 4).map((item) => ({ value: item.id, label: item.displayName })),
+      { value: "new", label: `Neu anlegen: ${name}` },
+    ],
+  };
+}
+
+/** Apply answers to earlier clarifying questions; shared by the rule parser and the AI path. */
+function applyAnswers(
+  parsed: ParsedAppointmentIntent,
+  catalog: IntentCatalog,
+  questions: ClarifyingQuestion[],
+  fieldConfidence: Record<string, number>,
+  answers: Record<string, string>,
+) {
+  const teacherAnswer = answers.teacher || answers.teacherId;
+  if (teacherAnswer) {
+    const teacher = catalog.teachers.find((t) => t.id === teacherAnswer);
+    if (teacher) {
+      parsed.teacherId = teacher.id;
+      parsed.teacherName = teacher.displayName;
+      fieldConfidence.teacherId = 1;
+      dropQuestion(questions, "teacher");
+    }
+  }
+  const lessonAnswer = answers.lessonType || answers.lessonTypeId;
+  if (lessonAnswer) {
+    const lesson = catalog.lessonTypes.find((t) => t.id === lessonAnswer);
+    if (lesson) {
+      parsed.lessonTypeId = lesson.id;
+      parsed.lessonTypeName = lesson.displayName;
+      fieldConfidence.lessonTypeId = 1;
+      dropQuestion(questions, "lessonType");
+    }
+  }
+  const customerAnswer = answers.customer || answers.customerId;
+  if (customerAnswer === "new") {
+    parsed.customerId = undefined;
+    parsed.createCustomer = true;
+    fieldConfidence.customerId = 1;
+    dropQuestion(questions, "customer");
+  } else if (customerAnswer) {
+    const customer = catalog.customers.find((c) => c.id === customerAnswer);
+    if (customer) {
+      parsed.customerId = customer.id;
+      parsed.customerName = customer.displayName;
+      parsed.createCustomer = false;
+      fieldConfidence.customerId = 1;
+      dropQuestion(questions, "customer");
+    }
+  }
+}
+
+/** Field values as produced by the AI model (names as text, no IDs). */
+export interface ExtractedIntent {
+  contactText: string;
+  date?: string | null;
+  time?: string | null;
+  durationMinutes?: number | null;
+  teacherName?: string | null;
+  lessonTypeName?: string | null;
+  resourceName?: string | null;
+  customerName?: string | null;
+  phone?: string | null;
+  note?: string | null;
+}
+
+/**
+ * Turn an AI extraction into the same result shape as the rule parser: validate
+ * values and resolve names against the tenant catalog (exact first, fuzzy with a question).
+ */
+export function resolveExtractedIntent(
+  extraction: ExtractedIntent,
+  catalog: IntentCatalog,
+  answers: Record<string, string> = {},
+): ParseIntentResult {
+  const parsed: ParsedAppointmentIntent = { contactText: extraction.contactText.replace(/\s+/g, " ").trim() };
+  const fieldConfidence: Record<string, number> = {};
+  const questions: ClarifyingQuestion[] = [];
+
+  if (extraction.date && /^\d{4}-\d{2}-\d{2}$/.test(extraction.date)) {
+    parsed.date = extraction.date;
+    fieldConfidence.date = 0.9;
+  }
+  if (extraction.time && /^\d{1,2}:\d{1,2}$/.test(extraction.time)) {
+    const [h, m] = extraction.time.split(":").map(Number);
+    if (h !== undefined && m !== undefined && h <= 23 && m <= 59) {
+      parsed.time = `${pad(h)}:${pad(m)}`;
+      fieldConfidence.time = 0.9;
+    }
+  }
+  const duration = extraction.durationMinutes;
+  if (typeof duration === "number" && Number.isFinite(duration) && duration > 0 && duration <= 24 * 60) {
+    parsed.durationMinutes = Math.round(duration);
+    fieldConfidence.durationMinutes = 0.85;
+  }
+  if (extraction.phone?.trim()) {
+    const phone = normalizePhone(extraction.phone);
+    if (digits(phone).length >= 6) {
+      parsed.phone = phone;
+      fieldConfidence.phone = 0.85;
+    }
+  }
+
+  const teacherQuery = extraction.teacherName?.trim();
+  if (teacherQuery) {
+    const { items, fuzzy } = matchByName(catalog.teachers, teacherQuery, (item) => item.displayName);
+    const single = items.length === 1 ? items[0] : undefined;
+    if (single) {
+      parsed.teacherId = single.id;
+      parsed.teacherName = single.displayName;
+      fieldConfidence.teacherId = fuzzy ? 0.75 : 0.9;
+    } else if (items.length > 1) {
+      questions.push({
+        id: "teacher",
+        prompt: `Welcher „${catalog.teacherLabel}“ ist gemeint?`,
+        options: items.slice(0, 5).map((item) => ({ value: item.id, label: item.displayName })),
+      });
+    }
+  }
+
+  const lessonQuery = extraction.lessonTypeName?.trim();
+  if (lessonQuery) {
+    const { items, fuzzy } = matchByName(catalog.lessonTypes, lessonQuery, (item) => item.displayName);
+    const single = items.length === 1 ? items[0] : undefined;
+    if (single) {
+      parsed.lessonTypeId = single.id;
+      parsed.lessonTypeName = single.displayName;
+      fieldConfidence.lessonTypeId = fuzzy ? 0.75 : 0.9;
+    } else if (items.length > 1) {
+      questions.push({
+        id: "lessonType",
+        prompt: "Welche Terminart ist gemeint?",
+        options: items.slice(0, 5).map((item) => ({ value: item.id, label: item.displayName })),
+      });
+    }
+  }
+
+  const resourceQuery = extraction.resourceName?.trim();
+  if (resourceQuery) {
+    const { items, fuzzy } = matchByName(catalog.resources, resourceQuery, (item) => item.name);
+    const single = items.length === 1 ? items[0] : undefined;
+    if (single) {
+      parsed.resourceId = single.id;
+      parsed.resourceName = single.name;
+      fieldConfidence.resourceId = fuzzy ? 0.7 : 0.85;
+    }
+  }
+
+  const customerQuery = extraction.customerName?.trim();
+  if (customerQuery) {
+    const { items, fuzzy } = matchByName(catalog.customers, customerQuery, (item) => item.displayName);
+    const single = items.length === 1 ? items[0] : undefined;
+    if (single && !fuzzy) {
+      parsed.customerId = single.id;
+      parsed.customerName = single.displayName;
+      parsed.createCustomer = false;
+      fieldConfidence.customerId = 0.9;
+    } else if (items.length >= 1) {
+      parsed.customerName = customerQuery;
+      parsed.createCustomer = true;
+      fieldConfidence.customerId = 0.6;
+      questions.push(customerQuestion(customerQuery, items, fuzzy));
+    } else {
+      parsed.customerName = customerQuery;
+      parsed.createCustomer = true;
+      fieldConfidence.customerId = 0.8;
+      fieldConfidence.customerName = 0.85;
+    }
+  } else if (parsed.phone) {
+    const byPhone = customerByPhone(catalog, parsed.phone);
+    if (byPhone) {
+      parsed.customerId = byPhone.id;
+      parsed.customerName = byPhone.displayName;
+      parsed.createCustomer = false;
+      fieldConfidence.customerId = 0.9;
+    }
+  }
+
+  if (extraction.note?.trim()) {
+    parsed.note = extraction.note.trim();
+  }
+
+  applyAnswers(parsed, catalog, questions, fieldConfidence, answers);
+
+  return {
+    parsed,
+    fieldConfidence,
+    clarifyingQuestions: questions.slice(0, 3),
+    suggestedDefaults: {},
+  };
 }
 
 export function parseAppointmentIntent(
@@ -500,7 +724,7 @@ export function parseAppointmentIntent(
   const teacherLabel = takeLabeledName(rest, new RegExp(`\\b(?:${roles.map(escapeRe).join("|")})\\b`, "i"));
   rest = teacherLabel.rest;
 
-  const lessonHits = findInText(catalog.lessonTypes, rest, (item) => item.displayName);
+  const lessonHits = findInText(catalog.lessonTypes, rest, (item) => item.displayName, { fuzzy: true });
   if (lessonHits.length === 1) {
     parsed.lessonTypeId = lessonHits[0].id;
     parsed.lessonTypeName = lessonHits[0].displayName;
@@ -518,6 +742,7 @@ export function parseAppointmentIntent(
     catalog.resources.map((item) => ({ id: item.id, displayName: item.name })),
     rest,
     (item) => item.displayName,
+    { fuzzy: true },
   );
   if (resourceHits.length === 1) {
     parsed.resourceId = resourceHits[0].id;
@@ -526,13 +751,16 @@ export function parseAppointmentIntent(
     rest = stripName(rest, resourceHits[0].displayName);
   }
 
-  const teacherHits = teacherLabel.name
-    ? catalog.teachers.filter((item) => nameMatches(item.displayName, teacherLabel.name!))
+  const labeledTeacher = teacherLabel.name
+    ? matchByName(catalog.teachers, teacherLabel.name, (item) => item.displayName)
+    : null;
+  const teacherHits = labeledTeacher
+    ? labeledTeacher.items
     : findInText(catalog.teachers, rest, (item) => item.displayName);
   if (teacherHits.length === 1) {
     parsed.teacherId = teacherHits[0].id;
     parsed.teacherName = teacherHits[0].displayName;
-    fieldConfidence.teacherId = teacherLabel.name ? 0.92 : 0.82;
+    fieldConfidence.teacherId = labeledTeacher ? (labeledTeacher.fuzzy ? 0.75 : 0.92) : 0.82;
     rest = stripName(rest, teacherHits[0].displayName);
   } else if (teacherHits.length > 1) {
     questions.push({
@@ -544,42 +772,7 @@ export function parseAppointmentIntent(
 
   rest = resolveCustomer(parsed, catalog, rest, questions, fieldConfidence);
 
-  const teacherAnswer = answers.teacher || answers.teacherId;
-  if (teacherAnswer) {
-    const teacher = catalog.teachers.find((t) => t.id === teacherAnswer);
-    if (teacher) {
-      parsed.teacherId = teacher.id;
-      parsed.teacherName = teacher.displayName;
-      fieldConfidence.teacherId = 1;
-      dropQuestion(questions, "teacher");
-    }
-  }
-  const lessonAnswer = answers.lessonType || answers.lessonTypeId;
-  if (lessonAnswer) {
-    const lesson = catalog.lessonTypes.find((t) => t.id === lessonAnswer);
-    if (lesson) {
-      parsed.lessonTypeId = lesson.id;
-      parsed.lessonTypeName = lesson.displayName;
-      fieldConfidence.lessonTypeId = 1;
-      dropQuestion(questions, "lessonType");
-    }
-  }
-  const customerAnswer = answers.customer || answers.customerId;
-  if (customerAnswer === "new") {
-    parsed.customerId = undefined;
-    parsed.createCustomer = true;
-    fieldConfidence.customerId = 1;
-    dropQuestion(questions, "customer");
-  } else if (customerAnswer) {
-    const customer = catalog.customers.find((c) => c.id === customerAnswer);
-    if (customer) {
-      parsed.customerId = customer.id;
-      parsed.customerName = customer.displayName;
-      parsed.createCustomer = false;
-      fieldConfidence.customerId = 1;
-      dropQuestion(questions, "customer");
-    }
-  }
+  applyAnswers(parsed, catalog, questions, fieldConfidence, answers);
 
   const leftover = rest.replace(/\s+/g, " ").trim();
   const leftoverTokens = leftover

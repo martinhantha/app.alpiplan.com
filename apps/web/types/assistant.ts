@@ -44,6 +44,8 @@ export interface ParsedAppointmentIntent {
 
 export interface ParseIntentResponse {
   parsed: ParsedAppointmentIntent;
+  /** "ai" when the model structured the text, "rules" for the built-in parser */
+  source?: "ai" | "rules";
   fieldConfidence: Record<string, number>;
   clarifyingQuestions: ClarifyingQuestion[];
   suggestedDefaults: Record<string, unknown>;

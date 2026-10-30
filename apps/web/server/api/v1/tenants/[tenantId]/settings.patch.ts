@@ -2,6 +2,7 @@ import { getRouterParam, readBody } from "h3";
 import { prisma } from "~/server/utils/prisma";
 import { assertUuid, requireTenantAccess } from "~/server/utils/authz";
 import { throwValidation } from "~/server/utils/api-errors";
+import { isSpeechLanguage } from "~/utils/speech-languages";
 
 const TENANT_SETTINGS_SELECT = {
   id: true,
@@ -13,6 +14,9 @@ const TENANT_SETTINGS_SELECT = {
   teacherLabel: true,
   resourcesEnabled: true,
   speechRecognitionEnabled: true,
+  speechLanguage: true,
+  aiParsingEnabled: true,
+  assistantHints: true,
   autoCompleteAppointments: true,
   autoCompleteAfterMinutes: true,
 } as const;
@@ -38,6 +42,9 @@ export default defineEventHandler(async (event) => {
       teacherLabel?: string;
       resourcesEnabled?: boolean;
       speechRecognitionEnabled?: boolean;
+      speechLanguage?: string;
+      aiParsingEnabled?: boolean;
+      assistantHints?: string | null;
       autoCompleteAppointments?: boolean;
       autoCompleteAfterMinutes?: number;
     }>(event)) ?? {};
@@ -49,6 +56,9 @@ export default defineEventHandler(async (event) => {
     teacherLabel?: string;
     resourcesEnabled?: boolean;
     speechRecognitionEnabled?: boolean;
+    speechLanguage?: string;
+    aiParsingEnabled?: boolean;
+    assistantHints?: string | null;
     autoCompleteAppointments?: boolean;
     autoCompleteAfterMinutes?: number;
   } = {};
@@ -60,6 +70,24 @@ export default defineEventHandler(async (event) => {
   }
   if (typeof body.speechRecognitionEnabled === "boolean") {
     data.speechRecognitionEnabled = body.speechRecognitionEnabled;
+  }
+  if (typeof body.aiParsingEnabled === "boolean") {
+    data.aiParsingEnabled = body.aiParsingEnabled;
+  }
+  if (Object.prototype.hasOwnProperty.call(body, "speechLanguage")) {
+    if (!isSpeechLanguage(body.speechLanguage)) {
+      throwValidation("Sprache wird nicht unterstützt", { field: "speechLanguage" });
+    }
+    data.speechLanguage = body.speechLanguage;
+  }
+  if (Object.prototype.hasOwnProperty.call(body, "assistantHints")) {
+    if (body.assistantHints === null || body.assistantHints === "") {
+      data.assistantHints = null;
+    } else if (typeof body.assistantHints === "string" && body.assistantHints.trim().length <= 2000) {
+      data.assistantHints = body.assistantHints.trim();
+    } else {
+      throwValidation("Hinweise dürfen maximal 2000 Zeichen haben", { field: "assistantHints" });
+    }
   }
   if (typeof body.autoCompleteAppointments === "boolean") {
     data.autoCompleteAppointments = body.autoCompleteAppointments;

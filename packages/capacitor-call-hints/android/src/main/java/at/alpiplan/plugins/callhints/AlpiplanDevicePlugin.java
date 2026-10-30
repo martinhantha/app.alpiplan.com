@@ -29,6 +29,7 @@ import android.provider.ContactsContract.CommonDataKinds.Organization;
 import android.provider.ContactsContract.CommonDataKinds.Phone;
 import android.provider.ContactsContract.CommonDataKinds.StructuredName;
 import android.provider.ContactsContract.RawContacts;
+import com.getcapacitor.JSArray;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.PermissionState;
 import com.getcapacitor.Plugin;
@@ -68,6 +69,7 @@ public class AlpiplanDevicePlugin extends Plugin {
     private int speechFailCount;
     private String lastPartial = "";
     private String speechLanguage = "de-DE";
+    private ArrayList<String> speechHints = new ArrayList<>();
     private final Handler speechHandler = new Handler(Looper.getMainLooper());
 
     private boolean microphoneGranted() {
@@ -719,6 +721,20 @@ public class AlpiplanDevicePlugin extends Plugin {
         if (lang != null && !lang.isEmpty()) {
             speechLanguage = lang;
         }
+        speechHints = new ArrayList<>();
+        JSArray hints = call.getArray("hints");
+        if (hints != null) {
+            for (int i = 0; i < hints.length(); i += 1) {
+                try {
+                    String hint = hints.getString(i);
+                    if (hint != null && !hint.trim().isEmpty()) {
+                        speechHints.add(hint.trim());
+                    }
+                } catch (Exception ignored) {
+                    // Skip malformed entries.
+                }
+            }
+        }
         getActivity().runOnUiThread(() -> {
             try {
                 if (!SpeechRecognizer.isRecognitionAvailable(getContext())) {
@@ -766,7 +782,10 @@ public class AlpiplanDevicePlugin extends Plugin {
         intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, speechLanguage);
         intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, speechLanguage);
         intent.putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true);
-        intent.putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1);
+        intent.putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 3);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && !speechHints.isEmpty()) {
+            intent.putExtra(RecognizerIntent.EXTRA_BIASING_STRINGS, speechHints);
+        }
         intent.putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, getContext().getPackageName());
         try {
             speechRecognizer.startListening(intent);
@@ -824,6 +843,10 @@ public class AlpiplanDevicePlugin extends Plugin {
     }
 
     private void emitTranscript(String transcript, boolean isFinal) {
+        emitTranscript(transcript, null, isFinal);
+    }
+
+    private void emitTranscript(String transcript, ArrayList<String> alternatives, boolean isFinal) {
         if (transcript == null) {
             return;
         }
@@ -833,6 +856,15 @@ public class AlpiplanDevicePlugin extends Plugin {
         }
         JSObject payload = new JSObject();
         payload.put("transcript", trimmed);
+        if (alternatives != null && alternatives.size() > 1) {
+            JSArray list = new JSArray();
+            for (String alternative : alternatives) {
+                if (alternative != null && !alternative.trim().isEmpty()) {
+                    list.put(alternative.trim());
+                }
+            }
+            payload.put("alternatives", list);
+        }
         payload.put("isFinal", isFinal);
         notifyListeners("speechTranscript", payload);
     }
@@ -922,7 +954,7 @@ public class AlpiplanDevicePlugin extends Plugin {
                     results == null ? null : results.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION);
                 String transcript = bestTranscript(matches);
                 lastPartial = "";
-                emitTranscript(transcript, true);
+                emitTranscript(transcript, matches, true);
                 emitSessionEnd();
                 if (speechListening) {
                     scheduleSpeechRestart();

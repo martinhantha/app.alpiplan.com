@@ -32,11 +32,12 @@ export interface AlpiplanDevicePlugin {
   openWhatsApp(options: { phone: string; app?: "whatsapp" | "business" }): Promise<void>;
   showLocalNotification(options: { title: string; body: string; id?: string }): Promise<void>;
   getPushToken(): Promise<{ token?: string | null }>;
-  startSpeechRecognition(options?: { lang?: string }): Promise<void>;
+  /** `hints`: known names (staff, customers, types) used to bias recognition on Android 13+. */
+  startSpeechRecognition(options?: { lang?: string; hints?: string[] }): Promise<void>;
   stopSpeechRecognition(): Promise<void>;
   addListener(
     eventName: "speechTranscript",
-    listenerFunc: (event: { transcript: string; isFinal: boolean }) => void,
+    listenerFunc: (event: { transcript: string; alternatives?: string[]; isFinal: boolean }) => void,
   ): Promise<PluginListenerHandle>;
   addListener(
     eventName: "speechError",

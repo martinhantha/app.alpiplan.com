@@ -5,6 +5,7 @@ import { isCallHintsOptIn } from "@alpiplan/device-capabilities";
 import { useWhatsAppPreference } from "../composables/useWhatsAppPreference";
 import { DEFAULT_BRIEFING_MINUTES, formatBriefingTime, parseBriefingTime } from "../utils/rome-time";
 import { normalizeUiScale, type UiScale } from "../utils/ui-scale";
+import { DEFAULT_SPEECH_LANGUAGE, SPEECH_LANGUAGES } from "../utils/speech-languages";
 import {
   disableWebPush,
   enableWebPush,
@@ -113,6 +114,9 @@ const speechRecognitionEnabledLocal = ref(false);
 const autoCompleteAppointmentsLocal = ref(false);
 const autoCompleteAfterMinutesLocal = ref(0);
 const teacherLabelLocal = ref("Lehrer");
+const speechLanguageLocal = ref<string>(DEFAULT_SPEECH_LANGUAGE);
+const aiParsingEnabledLocal = ref(false);
+const assistantHintsLocal = ref("");
 const defaultTeacherIdLocal = ref("");
 const lastSavedDefaultTeacherId = ref("");
 const defaultLessonTypeIdLocal = ref("");
@@ -159,6 +163,27 @@ watch(
   },
   { immediate: true },
 );
+watch(
+  () => primaryTenant.value?.speechLanguage,
+  (v) => {
+    speechLanguageLocal.value = v || DEFAULT_SPEECH_LANGUAGE;
+  },
+  { immediate: true },
+);
+watch(
+  () => primaryTenant.value?.aiParsingEnabled,
+  (v) => {
+    aiParsingEnabledLocal.value = v ?? false;
+  },
+  { immediate: true },
+);
+watch(
+  () => primaryTenant.value?.assistantHints,
+  (v) => {
+    assistantHintsLocal.value = v ?? "";
+  },
+  { immediate: true },
+);
 
 async function saveTenantSettings(patch: {
   useDefaultDuration?: boolean;
@@ -167,6 +192,9 @@ async function saveTenantSettings(patch: {
   teacherLabel?: string;
   resourcesEnabled?: boolean;
   speechRecognitionEnabled?: boolean;
+  speechLanguage?: string;
+  aiParsingEnabled?: boolean;
+  assistantHints?: string | null;
   autoCompleteAppointments?: boolean;
   autoCompleteAfterMinutes?: number;
 }) {
@@ -180,6 +208,9 @@ async function saveTenantSettings(patch: {
       teacherLabel: string;
       resourcesEnabled: boolean;
       speechRecognitionEnabled: boolean;
+      speechLanguage: string;
+      aiParsingEnabled: boolean;
+      assistantHints: string | null;
       autoCompleteAppointments: boolean;
       autoCompleteAfterMinutes: number;
     }>(`/api/v1/tenants/${primaryTenant.value.tenantId}/settings`, {
@@ -205,6 +236,15 @@ async function saveTenantSettings(patch: {
     if (typeof saved.teacherLabel === "string") {
       teacherLabelLocal.value = saved.teacherLabel;
     }
+    if (typeof saved.speechLanguage === "string") {
+      speechLanguageLocal.value = saved.speechLanguage;
+    }
+    if (typeof saved.aiParsingEnabled === "boolean") {
+      aiParsingEnabledLocal.value = saved.aiParsingEnabled;
+    }
+    if (Object.prototype.hasOwnProperty.call(saved, "assistantHints")) {
+      assistantHintsLocal.value = saved.assistantHints ?? "";
+    }
     if (Object.prototype.hasOwnProperty.call(saved, "defaultTeacherId")) {
       defaultTeacherIdLocal.value = saved.defaultTeacherId ?? "";
       lastSavedDefaultTeacherId.value = defaultTeacherIdLocal.value;
@@ -224,11 +264,21 @@ async function saveTenantSettings(patch: {
     autoCompleteAppointmentsLocal.value = primaryTenant.value?.autoCompleteAppointments ?? false;
     autoCompleteAfterMinutesLocal.value = primaryTenant.value?.autoCompleteAfterMinutes ?? 0;
     teacherLabelLocal.value = primaryTenant.value?.teacherLabel?.trim() || "Lehrer";
+    speechLanguageLocal.value = primaryTenant.value?.speechLanguage || DEFAULT_SPEECH_LANGUAGE;
+    aiParsingEnabledLocal.value = primaryTenant.value?.aiParsingEnabled ?? false;
+    assistantHintsLocal.value = primaryTenant.value?.assistantHints ?? "";
     defaultTeacherIdLocal.value = lastSavedDefaultTeacherId.value;
     defaultLessonTypeIdLocal.value = lastSavedDefaultLessonTypeId.value;
   } finally {
     tenantSettingsSaving.value = false;
   }
+}
+
+function saveAssistantHints() {
+  const next = assistantHintsLocal.value.trim();
+  assistantHintsLocal.value = next;
+  if (next === (primaryTenant.value?.assistantHints ?? "")) return;
+  saveTenantSettings({ assistantHints: next || null });
 }
 
 function saveTeacherLabel() {
@@ -837,6 +887,61 @@ onBeforeUnmount(() => {
             />
             <div class="w-11 h-6 bg-neutral-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-neutral-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-500 dark:bg-neutral-700 dark:after:bg-neutral-200" />
           </label>
+        </div>
+
+        <div class="mt-6 pt-4 border-t border-neutral-200 dark:border-neutral-800 space-y-2">
+          <p class="font-medium text-sm">{{ t("settingsPage.speechLanguageTitle") }}</p>
+          <p class="text-xs text-neutral-500">
+            {{ t("settingsPage.speechLanguageHint") }}
+          </p>
+          <select
+            v-model="speechLanguageLocal"
+            class="w-full max-w-md rounded-md border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-3 py-2 text-sm"
+            :disabled="!canEdit || tenantSettingsSaving"
+            @change="saveTenantSettings({ speechLanguage: speechLanguageLocal })"
+          >
+            <option v-for="lang in SPEECH_LANGUAGES" :key="lang" :value="lang">{{ t(`settingsPage.speechLanguages.${lang}`) }}</option>
+          </select>
+        </div>
+
+        <div class="flex items-start justify-between gap-4 mt-6 pt-4 border-t border-neutral-200 dark:border-neutral-800">
+          <div class="text-sm">
+            <p class="font-medium">{{ t("settingsPage.aiParsingTitle") }}</p>
+            <p class="text-xs text-neutral-500 mt-1">
+              {{ t("settingsPage.aiParsingHint") }}
+            </p>
+          </div>
+          <label class="relative inline-flex items-center cursor-pointer shrink-0 mt-1">
+            <input
+              type="checkbox"
+              class="sr-only peer"
+              :checked="aiParsingEnabledLocal"
+              :disabled="!canEdit || tenantSettingsSaving"
+              @change="
+                () => {
+                  aiParsingEnabledLocal = !aiParsingEnabledLocal;
+                  saveTenantSettings({ aiParsingEnabled: aiParsingEnabledLocal });
+                }
+              "
+            />
+            <div class="w-11 h-6 bg-neutral-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-neutral-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-500 dark:bg-neutral-700 dark:after:bg-neutral-200" />
+          </label>
+        </div>
+
+        <div v-if="aiParsingEnabledLocal" class="mt-4 space-y-2">
+          <p class="font-medium text-sm">{{ t("settingsPage.assistantHintsTitle") }}</p>
+          <p class="text-xs text-neutral-500">
+            {{ t("settingsPage.assistantHintsHint") }}
+          </p>
+          <UTextarea
+            v-model="assistantHintsLocal"
+            class="w-full max-w-md"
+            :rows="4"
+            :maxlength="2000"
+            :placeholder="t('settingsPage.assistantHintsPlaceholder')"
+            :disabled="!canEdit || tenantSettingsSaving"
+            @blur="saveAssistantHints"
+          />
         </div>
 
         <div class="flex items-start justify-between gap-4 mt-6 pt-4 border-t border-neutral-200 dark:border-neutral-800">
