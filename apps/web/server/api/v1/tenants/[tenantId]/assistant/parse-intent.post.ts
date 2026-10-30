@@ -141,6 +141,8 @@ export default defineEventHandler(async (event) => {
     const ownTeacher = teachers.find((teacher) => teacher.id === scope.forceTeacherId);
     result.parsed.teacherId = scope.forceTeacherId;
     result.parsed.teacherName = ownTeacher?.displayName;
+    result.parsed.teacherIds = [scope.forceTeacherId];
+    result.parsed.teacherNames = ownTeacher ? [ownTeacher.displayName] : [];
     result.fieldConfidence.teacherId = 1;
   }
 

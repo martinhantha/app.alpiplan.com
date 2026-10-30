@@ -40,6 +40,9 @@ export interface ParsedAppointmentIntent {
   durationMinutes?: number;
   teacherId?: string;
   teacherName?: string;
+  /** All assigned staff (teacherId is the first); more than one e.g. for two pilots */
+  teacherIds?: string[];
+  teacherNames?: string[];
   resourceId?: string;
   resourceName?: string;
   lessonTypeId?: string;
@@ -474,6 +477,49 @@ function dropQuestion(questions: ClarifyingQuestion[], id: string) {
   if (index >= 0) questions.splice(index, 1);
 }
 
+/**
+ * Staff mentioned in free text without ambiguity: full name present, or a first
+ * name that only one staff member has. Shared first names ("Martin") are skipped.
+ */
+function unambiguousTeachers(teachers: IntentEntity[], text: string): IntentEntity[] {
+  const folded = fold(text);
+  const present = (candidate: string) =>
+    new RegExp(`(?:^|[^a-z0-9])${escapeRe(candidate)}(?=[^a-z0-9]|$)`).test(folded);
+  const hits = findInText(teachers, text, (item) => item.displayName);
+  const firstWordCount = new Map<string, number>();
+  for (const item of hits) {
+    const first = wordsOf(item.displayName)[0] ?? "";
+    firstWordCount.set(first, (firstWordCount.get(first) ?? 0) + 1);
+  }
+  return hits.filter((item) => {
+    if (present(fold(item.displayName))) return true;
+    const first = wordsOf(item.displayName)[0] ?? "";
+    return first.length >= 2 && firstWordCount.get(first) === 1;
+  });
+}
+
+/** Append a staff member; the first one also fills the legacy single teacherId/teacherName. */
+function addTeacher(
+  parsed: ParsedAppointmentIntent,
+  teacher: IntentEntity,
+  fieldConfidence: Record<string, number>,
+  confidence: number,
+) {
+  const ids = parsed.teacherIds ?? (parsed.teacherId ? [parsed.teacherId] : []);
+  const names = parsed.teacherNames ?? (parsed.teacherName ? [parsed.teacherName] : []);
+  if (!ids.includes(teacher.id)) {
+    ids.push(teacher.id);
+    names.push(teacher.displayName);
+  }
+  parsed.teacherIds = ids;
+  parsed.teacherNames = names;
+  if (!parsed.teacherId) {
+    parsed.teacherId = teacher.id;
+    parsed.teacherName = teacher.displayName;
+  }
+  fieldConfidence.teacherId = Math.max(fieldConfidence.teacherId ?? 0, confidence);
+}
+
 function customerQuestion(name: string, hits: IntentCustomer[], fuzzy: boolean): ClarifyingQuestion {
   return {
     id: "customer",
@@ -497,9 +543,7 @@ function applyAnswers(
   if (teacherAnswer) {
     const teacher = catalog.teachers.find((t) => t.id === teacherAnswer);
     if (teacher) {
-      parsed.teacherId = teacher.id;
-      parsed.teacherName = teacher.displayName;
-      fieldConfidence.teacherId = 1;
+      addTeacher(parsed, teacher, fieldConfidence, 1);
       dropQuestion(questions, "teacher");
     }
   }
@@ -538,6 +582,7 @@ export interface ExtractedIntent {
   time?: string | null;
   durationMinutes?: number | null;
   teacherName?: string | null;
+  teacherNames?: string[] | null;
   lessonTypeName?: string | null;
   resourceName?: string | null;
   customerName?: string | null;
@@ -582,18 +627,18 @@ export function resolveExtractedIntent(
     }
   }
 
-  const teacherQuery = extraction.teacherName?.trim();
-  if (teacherQuery) {
+  const teacherQueries = [...(extraction.teacherNames ?? []), extraction.teacherName ?? ""]
+    .map((name) => name.trim())
+    .filter((name, index, all) => name && all.indexOf(name) === index);
+  for (const teacherQuery of teacherQueries) {
     const { items, fuzzy } = matchByName(catalog.teachers, teacherQuery, (item) => item.displayName);
     const single = items.length === 1 ? items[0] : undefined;
     if (single) {
-      parsed.teacherId = single.id;
-      parsed.teacherName = single.displayName;
-      fieldConfidence.teacherId = fuzzy ? 0.75 : 0.9;
-    } else if (items.length > 1) {
+      addTeacher(parsed, single, fieldConfidence, fuzzy ? 0.75 : 0.9);
+    } else if (items.length > 1 && !questions.some((q) => q.id === "teacher")) {
       questions.push({
         id: "teacher",
-        prompt: `Welcher „${catalog.teacherLabel}“ ist gemeint?`,
+        prompt: `Welcher „${catalog.teacherLabel}“ ist mit „${teacherQuery}“ gemeint?`,
         options: items.slice(0, 5).map((item) => ({ value: item.id, label: item.displayName })),
       });
     }
@@ -758,10 +803,16 @@ export function parseAppointmentIntent(
     ? labeledTeacher.items
     : findInText(catalog.teachers, rest, (item) => item.displayName);
   if (teacherHits.length === 1) {
-    parsed.teacherId = teacherHits[0].id;
-    parsed.teacherName = teacherHits[0].displayName;
-    fieldConfidence.teacherId = labeledTeacher ? (labeledTeacher.fuzzy ? 0.75 : 0.92) : 0.82;
+    addTeacher(parsed, teacherHits[0], fieldConfidence, labeledTeacher ? (labeledTeacher.fuzzy ? 0.75 : 0.92) : 0.82);
     rest = stripName(rest, teacherHits[0].displayName);
+    // "Pilot Sepp und Martin Huber": further staff named alongside the labeled one join the appointment.
+    if (labeledTeacher) {
+      for (const extra of unambiguousTeachers(catalog.teachers, rest)) {
+        if (extra.id === parsed.teacherId) continue;
+        addTeacher(parsed, extra, fieldConfidence, 0.8);
+        rest = stripName(rest, extra.displayName);
+      }
+    }
   } else if (teacherHits.length > 1) {
     questions.push({
       id: "teacher",

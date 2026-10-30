@@ -30,6 +30,9 @@ export interface ParsedAppointmentIntent {
   durationMinutes?: number;
   teacherId?: string;
   teacherName?: string;
+  /** All assigned staff (teacherId is the first); e.g. two pilots */
+  teacherIds?: string[];
+  teacherNames?: string[];
   resourceId?: string;
   resourceName?: string;
   lessonTypeId?: string;

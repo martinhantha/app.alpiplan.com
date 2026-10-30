@@ -453,12 +453,13 @@ function applyParsed(
   if (parsed.date && (!isEditing.value || !slotSuggested)) form.date = parsed.date;
   if (parsed.time && (!isEditing.value || !slotSuggested)) form.time = parsed.time;
   if (parsed.durationMinutes) form.durationMinutes = parsed.durationMinutes;
+  const parsedTeacherIds = parsed.teacherIds?.length ? parsed.teacherIds : parsed.teacherId ? [parsed.teacherId] : [];
   if (
     canPlanAllAppointments.value &&
-    parsed.teacherId &&
+    parsedTeacherIds.length &&
     (!isEditing.value || !slotSuggested || !form.teacherIds.length)
   ) {
-    setTeacherIds([parsed.teacherId], true);
+    setTeacherIds(parsedTeacherIds, true);
   }
   if (parsed.resourceId) form.resourceId = parsed.resourceId;
   if (parsed.lessonTypeId) form.lessonTypeId = parsed.lessonTypeId;
