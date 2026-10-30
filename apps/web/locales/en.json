@@ -156,6 +156,7 @@
     "speechFailed": "Voice recording failed.",
     "speechStartFailed": "Could not start voice recording.",
     "parseClarify": "Please clarify briefly – then all fields are complete.",
+    "parseViaAi": "AI parsing",
     "parseFound": "Fields applied. Passenger found: {name}. Please check and save.",
     "parseNewCustomer": "Fields applied. Passenger “{name}” will be created as a new customer on save.",
     "parseNoCustomer": "Fields applied, but no passenger detected. Please enter the name below.",

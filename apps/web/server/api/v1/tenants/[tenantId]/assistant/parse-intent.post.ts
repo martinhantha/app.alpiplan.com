@@ -100,6 +100,9 @@ export default defineEventHandler(async (event) => {
       });
       result = resolveExtractedIntent({ ...ai.extraction, contactText: text }, catalog, answers);
       source = "ai";
+      console.info(
+        `[assistant] ${ai.provider}/${ai.model} ${ai.latencyMs}ms in=${ai.usage.inputTokens} out=${ai.usage.outputTokens} tenant=${access.tenant.slug}`,
+      );
       void prisma.assistantUsage
         .create({
           data: {

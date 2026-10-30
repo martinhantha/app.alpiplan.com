@@ -156,6 +156,7 @@
     "speechFailed": "Registrazione vocale non riuscita.",
     "speechStartFailed": "Impossibile avviare la registrazione vocale.",
     "parseClarify": "Chiarisci ancora un dettaglio – poi i campi sono completi.",
+    "parseViaAi": "Analisi IA",
     "parseFound": "Campi compilati. Passeggero trovato: {name}. Controlla e salva.",
     "parseNewCustomer": "Campi compilati. Il passeggero «{name}» verrà creato come nuovo cliente al salvataggio.",
     "parseNoCustomer": "Campi compilati, ma nessun passeggero riconosciuto. Inserisci il nome qui sotto.",

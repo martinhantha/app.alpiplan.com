@@ -156,6 +156,7 @@
     "speechFailed": "Sprachaufnahme fehlgeschlagen.",
     "speechStartFailed": "Sprachaufnahme konnte nicht gestartet werden.",
     "parseClarify": "Bitte noch kurz klären – danach sind die Felder vollständig.",
+    "parseViaAi": "KI-Auswertung",
     "parseFound": "Felder übernommen. Passagier gefunden: {name}. Bitte prüfen und speichern.",
     "parseNewCustomer": "Felder übernommen. Passagier „{name}“ wird beim Speichern als neuer Kunde angelegt.",
     "parseNoCustomer": "Felder übernommen, aber kein Passagier erkannt. Name bitte unten eintragen.",

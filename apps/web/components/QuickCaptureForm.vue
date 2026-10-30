@@ -515,13 +515,15 @@ async function parseFromText() {
       const who = typeof slot.teacherName === "string" && slot.teacherName ? ` · ${slot.teacherName}` : "";
       return ` ${t("quickCapture.parseNextSlot", { priority: Number(slot.priority) || 0, when, who })}`;
     })();
-    parseHint.value = questions.value.length
+    const hint = questions.value.length
       ? t("quickCapture.parseClarify")
       : passenger
         ? result.parsed.customerId
           ? `${t("quickCapture.parseFound", { name: passenger })}${slotHint}`
           : `${t("quickCapture.parseNewCustomer", { name: passenger })}${slotHint}`
         : `${t("quickCapture.parseNoCustomer")}${slotHint}`;
+    // Visible marker that the AI model (not the rule parser) structured the text.
+    parseHint.value = result.source === "ai" ? `${t("quickCapture.parseViaAi")} · ${hint}` : hint;
   } catch (e: unknown) {
     error.value = apiErrorMessage(e);
   } finally {
