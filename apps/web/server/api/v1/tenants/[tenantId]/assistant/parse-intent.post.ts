@@ -8,7 +8,7 @@ import {
   type IntentCatalog,
   type ParseIntentResult,
 } from "~/server/utils/parse-intent";
-import { aiIntentModel, extractIntentWithAi, isAiIntentAvailable } from "~/server/utils/ai-intent";
+import { aiIntentLabel, extractIntentWithAi, isAiIntentAvailable } from "~/server/utils/ai-intent";
 import { suggestNextPrioritySlot } from "~/server/utils/scheduling";
 
 const TIME_ZONE = "Europe/Rome";
@@ -105,7 +105,7 @@ export default defineEventHandler(async (event) => {
           data: {
             tenantId: access.tenant.id,
             userId: access.actorUserId,
-            model: ai.model,
+            model: `${ai.provider}/${ai.model}`,
             inputTokens: ai.usage.inputTokens,
             outputTokens: ai.usage.outputTokens,
             cacheReadTokens: ai.usage.cacheReadTokens,
@@ -121,7 +121,7 @@ export default defineEventHandler(async (event) => {
           data: {
             tenantId: access.tenant.id,
             userId: access.actorUserId,
-            model: aiIntentModel(),
+            model: aiIntentLabel(),
             latencyMs: Date.now() - started,
             ok: false,
           },

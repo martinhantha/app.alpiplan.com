@@ -68,10 +68,18 @@ export default defineEventHandler(async (event) => {
   if (typeof body.resourcesEnabled === "boolean") {
     data.resourcesEnabled = body.resourcesEnabled;
   }
+  // Speech recognition and AI parsing are enabled per tenant by the operator (superadmin) only.
+  const isSuperadmin = Boolean(access.session.user.isSuperadmin);
   if (typeof body.speechRecognitionEnabled === "boolean") {
+    if (!isSuperadmin) {
+      throwValidation("Spracherkennung wird vom Betreiber freigeschaltet", { field: "speechRecognitionEnabled" });
+    }
     data.speechRecognitionEnabled = body.speechRecognitionEnabled;
   }
   if (typeof body.aiParsingEnabled === "boolean") {
+    if (!isSuperadmin) {
+      throwValidation("KI-Textauswertung wird vom Betreiber freigeschaltet", { field: "aiParsingEnabled" });
+    }
     data.aiParsingEnabled = body.aiParsingEnabled;
   }
   if (Object.prototype.hasOwnProperty.call(body, "speechLanguage")) {

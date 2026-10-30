@@ -581,6 +581,7 @@
     "assistantHintsTitle": "Hinweise für die Textauswertung",
     "assistantHintsHint": "Eigene Begriffe, Abkürzungen und Spitznamen, z. B. „Tandem = Passagierflug“, „Sepp = Josef Huber“.",
     "assistantHintsPlaceholder": "Ein Hinweis pro Zeile …",
+    "operatorOnly": "Wird vom Betreiber (Superadmin) pro Mandant freigeschaltet.",
     "autoCompleteTitle": "Termine automatisch als erledigt markieren",
     "autoCompleteHint": "Gilt für alle Benutzer. Offene Termine werden erledigt, sobald das Ende plus die angegebene Zeit vorbei ist.",
     "autoCompleteMinutes": "Minuten nach Terminende",
@@ -716,6 +717,10 @@
     "deleteConfirm": "Termintyp „{name}“ löschen? Er kann im Papierkorb wiederhergestellt werden."
   },
   "tenantsPage": {
+    "speechRecognition": "Spracherkennung freischalten",
+    "speechRecognitionHint": "Mikrofon-Diktat in der Schnellerfassung. Der Mandant kann die Sprache selbst wählen.",
+    "aiParsing": "KI-Textauswertung freischalten",
+    "aiParsingHint": "Felder werden per Sprachmodell aus Text und Diktat befüllt. Verursacht API-Kosten je Anfrage.",
     "superadminOnly": "Diese Seite ist nur für Superadmins zugänglich.",
     "breadcrumb": "Alpiplan · Mandanten",
     "title": "Mandanten",

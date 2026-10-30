@@ -581,6 +581,7 @@
     "assistantHintsTitle": "Indicazioni per l'analisi del testo",
     "assistantHintsHint": "Termini propri, abbreviazioni e soprannomi, ad es. «Tandem = volo passeggeri», «Sepp = Josef Huber».",
     "assistantHintsPlaceholder": "Un'indicazione per riga…",
+    "operatorOnly": "Viene attivato per cliente dal gestore (superadmin).",
     "autoCompleteTitle": "Segna gli appuntamenti come fatti in automatico",
     "autoCompleteHint": "Vale per tutti. Gli appuntamenti aperti diventano fatti quando è passata la fine più il tempo indicato.",
     "autoCompleteMinutes": "Minuti dopo la fine dell’appuntamento",
@@ -716,6 +717,10 @@
     "deleteConfirm": "Eliminare il tipo “{name}”? Si può ripristinare dal cestino."
   },
   "tenantsPage": {
+    "speechRecognition": "Abilita riconoscimento vocale",
+    "speechRecognitionHint": "Dettatura con microfono nella registrazione rapida. Il cliente sceglie la lingua.",
+    "aiParsing": "Abilita analisi del testo con IA",
+    "aiParsingHint": "I campi vengono compilati da un modello linguistico da testo e dettato. Genera costi API per richiesta.",
     "superadminOnly": "Questa pagina è solo per i superadmin.",
     "breadcrumb": "Alpiplan · Tenant",
     "title": "Tenant",

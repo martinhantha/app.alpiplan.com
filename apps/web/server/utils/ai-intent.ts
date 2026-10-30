@@ -1,21 +1,50 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
+import { GoogleGenAI } from "@google/genai";
 import { z } from "zod";
 
 /**
  * AI extraction for Schnellerfassung. The model only structures the text; IDs are
  * resolved server-side against the tenant catalog (see resolveExtractedIntent).
  * Customers are deliberately NOT sent to the model (data minimisation).
+ *
+ * Provider is chosen globally via env: ASSISTANT_AI_PROVIDER=anthropic|gemini, or
+ * automatically from whichever API key is present (Anthropic first).
  */
 
-const DEFAULT_MODEL = "claude-haiku-5-5";
+export type AiProvider = "anthropic" | "gemini";
 
-export function aiIntentModel(): string {
-  return process.env.ANTHROPIC_INTENT_MODEL?.trim() || DEFAULT_MODEL;
+const DEFAULT_MODELS: Record<AiProvider, string> = {
+  anthropic: "claude-haiku-5-5",
+  gemini: "gemini-2.5-flash",
+};
+
+function hasKey(name: string): boolean {
+  return Boolean(process.env[name]?.trim());
+}
+
+export function aiIntentProvider(): AiProvider | null {
+  const forced = process.env.ASSISTANT_AI_PROVIDER?.trim().toLowerCase();
+  if (forced === "gemini") return hasKey("GEMINI_API_KEY") ? "gemini" : null;
+  if (forced === "anthropic") return hasKey("ANTHROPIC_API_KEY") ? "anthropic" : null;
+  if (hasKey("ANTHROPIC_API_KEY")) return "anthropic";
+  if (hasKey("GEMINI_API_KEY")) return "gemini";
+  return null;
+}
+
+export function aiIntentModel(provider: AiProvider): string {
+  const override = provider === "gemini" ? process.env.GEMINI_INTENT_MODEL : process.env.ANTHROPIC_INTENT_MODEL;
+  return override?.trim() || DEFAULT_MODELS[provider];
+}
+
+/** "provider/model" for logs; falls back to "none" when no provider is configured. */
+export function aiIntentLabel(): string {
+  const provider = aiIntentProvider();
+  return provider ? `${provider}/${aiIntentModel(provider)}` : "none";
 }
 
 export function isAiIntentAvailable(): boolean {
-  return Boolean(process.env.ANTHROPIC_API_KEY?.trim());
+  return aiIntentProvider() !== null;
 }
 
 const ExtractionSchema = z.object({
@@ -32,6 +61,24 @@ const ExtractionSchema = z.object({
 
 export type AiExtraction = z.infer<typeof ExtractionSchema>;
 
+/** Same shape as ExtractionSchema, as JSON Schema for Gemini's responseJsonSchema. */
+const EXTRACTION_JSON_SCHEMA = {
+  type: "object",
+  properties: {
+    date: { anyOf: [{ type: "string" }, { type: "null" }], description: "Appointment date as YYYY-MM-DD, resolved relative to today; null if not mentioned" },
+    time: { anyOf: [{ type: "string" }, { type: "null" }], description: "Start time as HH:MM (24h); null unless a concrete clock time is given" },
+    durationMinutes: { anyOf: [{ type: "integer" }, { type: "null" }], description: "Duration in minutes; null if not mentioned" },
+    teacherName: { anyOf: [{ type: "string" }, { type: "null" }], description: "Exact spelling from the staff list, or null" },
+    lessonTypeName: { anyOf: [{ type: "string" }, { type: "null" }], description: "Exact spelling from the appointment-type list, or null" },
+    resourceName: { anyOf: [{ type: "string" }, { type: "null" }], description: "Exact spelling from the resource list, or null" },
+    customerName: { anyOf: [{ type: "string" }, { type: "null" }], description: "Name of the customer/passenger/student the appointment is for, properly capitalised; null if none" },
+    phone: { anyOf: [{ type: "string" }, { type: "null" }], description: "Phone number, digits with optional leading + or 0; null if none" },
+    note: { anyOf: [{ type: "string" }, { type: "null" }], description: "Remaining meaningful information not covered by other fields; null if nothing is left" },
+  },
+  required: ["date", "time", "durationMinutes", "teacherName", "lessonTypeName", "resourceName", "customerName", "phone", "note"],
+  additionalProperties: false,
+} as const;
+
 export interface AiIntentCatalog {
   now: Date;
   timeZone: string;
@@ -45,6 +92,7 @@ export interface AiIntentCatalog {
 
 export interface AiIntentResult {
   extraction: AiExtraction;
+  provider: AiProvider;
   model: string;
   latencyMs: number;
   usage: { inputTokens: number; outputTokens: number; cacheReadTokens: number };
@@ -94,34 +142,41 @@ function buildSystemPrompt(catalog: AiIntentCatalog): string {
   ].join("\n");
 }
 
-function localDateLine(now: Date, timeZone: string): string {
+function buildUserPrompt(text: string, now: Date, timeZone: string): string {
   const date = new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).format(now);
   const weekday = new Intl.DateTimeFormat("en-GB", { timeZone, weekday: "long" }).format(now);
   const time = new Intl.DateTimeFormat("en-GB", { timeZone, hour: "2-digit", minute: "2-digit", hour12: false }).format(now);
-  return `Current date: ${date} (${weekday}), current time ${time}, time zone ${timeZone}.`;
+  return `Current date: ${date} (${weekday}), current time ${time}, time zone ${timeZone}.\n\nText:\n${text}`;
 }
 
-let client: Anthropic | null = null;
-function getClient(): Anthropic {
-  if (!client) {
-    client = new Anthropic({ timeout: 12_000, maxRetries: 1 });
+const TIMEOUT_MS = 12_000;
+
+let anthropicClient: Anthropic | null = null;
+function getAnthropic(): Anthropic {
+  if (!anthropicClient) {
+    anthropicClient = new Anthropic({ timeout: TIMEOUT_MS, maxRetries: 1 });
   }
-  return client;
+  return anthropicClient;
 }
 
-export async function extractIntentWithAi(text: string, catalog: AiIntentCatalog): Promise<AiIntentResult> {
-  const model = aiIntentModel();
-  const started = Date.now();
-  const response = await getClient().messages.parse({
+let geminiClient: GoogleGenAI | null = null;
+function getGemini(): GoogleGenAI {
+  if (!geminiClient) {
+    geminiClient = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY?.trim(), httpOptions: { timeout: TIMEOUT_MS } });
+  }
+  return geminiClient;
+}
+
+async function extractWithAnthropic(
+  model: string,
+  systemPrompt: string,
+  userPrompt: string,
+): Promise<Omit<AiIntentResult, "provider" | "model" | "latencyMs">> {
+  const response = await getAnthropic().messages.parse({
     model,
     max_tokens: 1024,
-    system: [{ type: "text", text: buildSystemPrompt(catalog), cache_control: { type: "ephemeral" } }],
-    messages: [
-      {
-        role: "user",
-        content: `${localDateLine(catalog.now, catalog.timeZone)}\n\nText:\n${text}`,
-      },
-    ],
+    system: [{ type: "text", text: systemPrompt, cache_control: { type: "ephemeral" } }],
+    messages: [{ role: "user", content: userPrompt }],
     output_config: { format: zodOutputFormat(ExtractionSchema), effort: "low" },
   });
   if (response.stop_reason === "refusal") {
@@ -132,12 +187,69 @@ export async function extractIntentWithAi(text: string, catalog: AiIntentCatalog
   }
   return {
     extraction: response.parsed_output,
-    model: response.model || model,
-    latencyMs: Date.now() - started,
     usage: {
       inputTokens: response.usage.input_tokens,
       outputTokens: response.usage.output_tokens,
       cacheReadTokens: response.usage.cache_read_input_tokens ?? 0,
     },
   };
+}
+
+async function extractWithGemini(
+  model: string,
+  systemPrompt: string,
+  userPrompt: string,
+): Promise<Omit<AiIntentResult, "provider" | "model" | "latencyMs">> {
+  const response = await getGemini().models.generateContent({
+    model,
+    contents: userPrompt,
+    config: {
+      systemInstruction: systemPrompt,
+      responseMimeType: "application/json",
+      responseJsonSchema: EXTRACTION_JSON_SCHEMA,
+      temperature: 0,
+      // Flash models accept a zero thinking budget; keeps latency low for a simple extraction.
+      ...(model.includes("flash") ? { thinkingConfig: { thinkingBudget: 0 } } : {}),
+    },
+  });
+  const text = response.text;
+  if (!text) {
+    const reason = response.candidates?.[0]?.finishReason ?? response.promptFeedback?.blockReason ?? "unknown";
+    throw new Error(`Gemini returned no text (reason=${reason})`);
+  }
+  let json: unknown;
+  try {
+    json = JSON.parse(text);
+  } catch {
+    throw new Error("Gemini returned invalid JSON");
+  }
+  const parsed = ExtractionSchema.safeParse(json);
+  if (!parsed.success) {
+    throw new Error(`Gemini output did not match the schema: ${parsed.error.message}`);
+  }
+  const usage = response.usageMetadata;
+  return {
+    extraction: parsed.data,
+    usage: {
+      inputTokens: usage?.promptTokenCount ?? 0,
+      outputTokens: (usage?.candidatesTokenCount ?? 0) + (usage?.thoughtsTokenCount ?? 0),
+      cacheReadTokens: usage?.cachedContentTokenCount ?? 0,
+    },
+  };
+}
+
+export async function extractIntentWithAi(text: string, catalog: AiIntentCatalog): Promise<AiIntentResult> {
+  const provider = aiIntentProvider();
+  if (!provider) {
+    throw new Error("No AI provider configured (ANTHROPIC_API_KEY or GEMINI_API_KEY)");
+  }
+  const model = aiIntentModel(provider);
+  const systemPrompt = buildSystemPrompt(catalog);
+  const userPrompt = buildUserPrompt(text, catalog.now, catalog.timeZone);
+  const started = Date.now();
+  const result =
+    provider === "gemini"
+      ? await extractWithGemini(model, systemPrompt, userPrompt)
+      : await extractWithAnthropic(model, systemPrompt, userPrompt);
+  return { ...result, provider, model, latencyMs: Date.now() - started };
 }

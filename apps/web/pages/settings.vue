@@ -871,13 +871,16 @@ onBeforeUnmount(() => {
             <p class="text-xs text-neutral-500 mt-1">
               {{ t("settingsPage.speechHint") }}
             </p>
+            <p v-if="!isSuperadmin" class="text-xs text-neutral-500 mt-1">
+              {{ t("settingsPage.operatorOnly") }}
+            </p>
           </div>
           <label class="relative inline-flex items-center cursor-pointer shrink-0 mt-1">
             <input
               type="checkbox"
               class="sr-only peer"
               :checked="speechRecognitionEnabledLocal"
-              :disabled="!canEdit || tenantSettingsSaving"
+              :disabled="!isSuperadmin || tenantSettingsSaving"
               @change="
                 () => {
                   speechRecognitionEnabledLocal = !speechRecognitionEnabledLocal;
@@ -910,13 +913,16 @@ onBeforeUnmount(() => {
             <p class="text-xs text-neutral-500 mt-1">
               {{ t("settingsPage.aiParsingHint") }}
             </p>
+            <p v-if="!isSuperadmin" class="text-xs text-neutral-500 mt-1">
+              {{ t("settingsPage.operatorOnly") }}
+            </p>
           </div>
           <label class="relative inline-flex items-center cursor-pointer shrink-0 mt-1">
             <input
               type="checkbox"
               class="sr-only peer"
               :checked="aiParsingEnabledLocal"
-              :disabled="!canEdit || tenantSettingsSaving"
+              :disabled="!isSuperadmin || tenantSettingsSaving"
               @change="
                 () => {
                   aiParsingEnabledLocal = !aiParsingEnabledLocal;

@@ -581,6 +581,7 @@
     "assistantHintsTitle": "Hints for text parsing",
     "assistantHintsHint": "Your own terms, abbreviations and nicknames, e.g. “Tandem = passenger flight”, “Sepp = Josef Huber”.",
     "assistantHintsPlaceholder": "One hint per line…",
+    "operatorOnly": "Enabled per tenant by the operator (superadmin).",
     "autoCompleteTitle": "Mark appointments as done automatically",
     "autoCompleteHint": "Applies to everyone. Open appointments are marked done once the end plus the given time has passed.",
     "autoCompleteMinutes": "Minutes after the appointment ends",
@@ -716,6 +717,10 @@
     "deleteConfirm": "Delete appointment type “{name}”? You can restore it from the trash."
   },
   "tenantsPage": {
+    "speechRecognition": "Enable speech recognition",
+    "speechRecognitionHint": "Microphone dictation in quick capture. The tenant picks the language.",
+    "aiParsing": "Enable AI text parsing",
+    "aiParsingHint": "Fields are filled from text and dictation by a language model. Causes API costs per request.",
     "superadminOnly": "This page is only available to superadmins.",
     "breadcrumb": "Alpiplan · Tenants",
     "title": "Tenants",
