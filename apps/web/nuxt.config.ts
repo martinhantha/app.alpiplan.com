@@ -60,10 +60,10 @@ export default defineNuxtConfig({
     },
     public: {
       demoEmail: process.env.NUXT_PUBLIC_DEMO_EMAIL ?? "demo@alpiplan.local",
-      /** Öffentliche Datenschutzseite / App-Store-URL */
+      /** Anbietername auf der Support-Seite */
       legalName: process.env.NUXT_PUBLIC_LEGAL_NAME ?? "Alpiplan",
-      legalAddress: process.env.NUXT_PUBLIC_LEGAL_ADDRESS ?? "",
-      privacyEmail: process.env.NUXT_PUBLIC_PRIVACY_EMAIL ?? "support@alpiplan.com",
+      /** Webseite mit der Datenschutzerklärung */
+      websiteUrl: process.env.NUXT_PUBLIC_WEBSITE_URL ?? "https://alpiplan.com",
       supportEmail: process.env.NUXT_PUBLIC_SUPPORT_EMAIL ?? "support@alpiplan.com",
     },
   },
@@ -72,9 +72,6 @@ export default defineNuxtConfig({
       external: ["@prisma/client", ".prisma/client"],
     },
     routeRules: {
-      "/datenschutz": {
-        headers: { "cache-control": "public, max-age=3600" },
-      },
       "/support": {
         headers: { "cache-control": "public, max-age=3600" },
       },

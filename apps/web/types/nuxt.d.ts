@@ -7,8 +7,7 @@ declare module "nuxt/schema" {
   interface PublicRuntimeConfig {
     demoEmail: string;
     legalName: string;
-    legalAddress: string;
-    privacyEmail: string;
+    websiteUrl: string;
     supportEmail: string;
   }
   interface PageMeta {
