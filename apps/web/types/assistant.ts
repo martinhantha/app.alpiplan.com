@@ -40,6 +40,12 @@ export interface ParsedAppointmentIntent {
   customerId?: string;
   customerName?: string;
   createCustomer?: boolean;
+  /** Further passengers; the model holds one customer, the rest is listed in the note */
+  additionalCustomerNames?: string[];
+  status?: "draft" | "confirmed";
+  reminderDate?: string;
+  reminderTime?: string;
+  reminderText?: string;
   phone?: string;
   note?: string;
   contactText?: string;

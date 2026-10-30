@@ -465,6 +465,12 @@ function applyParsed(
   if (parsed.lessonTypeId) form.lessonTypeId = parsed.lessonTypeId;
   if (parsed.phone) form.phone = parsed.phone;
   if (parsed.note) form.note = parsed.note;
+  if (parsed.status === "draft" || parsed.status === "confirmed") form.status = parsed.status;
+  if (parsed.reminderDate || parsed.reminderText) {
+    if (parsed.reminderDate) form.reminderDate = parsed.reminderDate;
+    if (parsed.reminderTime) form.reminderTime = parsed.reminderTime;
+    if (parsed.reminderText) form.reminderText = parsed.reminderText;
+  }
   if (parsed.customerId) {
     form.customerId = parsed.customerId;
     const known = options.value?.customers.find((item) => item.id === parsed.customerId);

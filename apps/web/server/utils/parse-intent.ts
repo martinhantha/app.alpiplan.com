@@ -50,6 +50,13 @@ export interface ParsedAppointmentIntent {
   customerId?: string;
   customerName?: string;
   createCustomer?: boolean;
+  /** Further people mentioned as passengers; the data model holds one customer, the rest goes into the note */
+  additionalCustomerNames?: string[];
+  /** draft | confirmed when the text says so */
+  status?: "draft" | "confirmed";
+  reminderDate?: string;
+  reminderTime?: string;
+  reminderText?: string;
   phone?: string;
   note?: string;
   contactText?: string;
@@ -92,7 +99,7 @@ const STOP = new Set([
   "am", "an", "auf", "bei", "bitte", "das", "dem", "den", "der", "die", "dort",
   "ein", "eine", "fuer", "hier", "im", "in", "ist", "mal", "mit", "nach", "noch",
   "ok", "okay", "plus", "so", "um", "und", "von", "zu", "zum", "uhr", "heute",
-  "morgen", "uebermorgen",
+  "morgen", "uebermorgen", "sind", "ist", "doch", "wir", "haben", "einen", "noch",
 ]);
 
 const NAME_STOP = new Set([
@@ -105,7 +112,7 @@ const NAME_STOP = new Set([
 ]);
 
 const PASSENGER_RE =
-  /\b(passa[sgjch]+(?:ier|er|e|in)?|passenger|fluggast|mitfahrer(?:in)?|kunde|kundin|schueler(?:in)?|gast|teilnehmer(?:in)?|namens)\b/i;
+  /\b(passa[sgjch]+(?:ier|iere|ierin|er|e|in)?|passengers?|fluggaeste|fluggast|mitfahrer(?:in)?|kunden?|kundin|schueler(?:in)?|gast|gaeste|teilnehmer(?:in)?|namens)\b/i;
 
 function pad(n: number): string {
   return String(n).padStart(2, "0");
@@ -310,23 +317,8 @@ function takeDate(text: string, now: Date, timeZone: string): { date?: string; r
     take(num.index, num.index + num[0].length, { year, month, day });
   }
 
-  const rel = [
-    { re: /\bheute\b/i, days: 0 },
-    { re: /\buebermorgen\b|\bübermorgen\b/i, days: 2 },
-    { re: /\bmorgen\b/i, days: 1 },
-  ];
-  for (const item of rel) {
-    const m = item.re.exec(rest);
-    if (m && !date) take(m.index, m.index + m[0].length, addDays(today, item.days));
-  }
-
-  const wd = new RegExp(`\\b(${Object.keys(WEEKDAYS).join("|")})\\b`, "i").exec(fold(rest));
-  if (wd && !date) {
-    const target = WEEKDAYS[fold(wd[1])];
-    take(wd.index, wd.index + wd[0].length, addDays(today, (target - today.weekday + 7) % 7));
-  }
-
-  const named = new RegExp(`\\b(\\d{1,2})\\.\\s*(${Object.keys(MONTHS).join("|")})(?:\\s*(\\d{4}))?\\b`, "i").exec(fold(rest));
+  // An explicit "16. November" wins over "morgen" even when it comes later ("... Termin ist doch am 16 November").
+  const named = new RegExp(`\\b(\\d{1,2})\\.?\\s*(${Object.keys(MONTHS).join("|")})(?:\\s*(\\d{4}))?\\b`, "i").exec(fold(rest));
   if (named && !date) {
     const day = Number(named[1]);
     const month = MONTHS[fold(named[2])];
@@ -335,7 +327,65 @@ function takeDate(text: string, now: Date, timeZone: string): { date?: string; r
     if (month) take(named.index, named.index + named[0].length, { year, month, day });
   }
 
+  const rel = [
+    { re: /\bheute\b/i, days: 0 },
+    { re: /\buebermorgen\b|\bübermorgen\b/i, days: 2 },
+    { re: /\bmorgen\b/i, days: 1 },
+  ];
+  for (const item of rel) {
+    const m = item.re.exec(rest);
+    if (!m) continue;
+    if (!date) take(m.index, m.index + m[0].length, addDays(today, item.days));
+    else rest = consume(rest, m.index, m.index + m[0].length);
+  }
+
+  const wd = new RegExp(`\\b(${Object.keys(WEEKDAYS).join("|")})\\b`, "i").exec(fold(rest));
+  if (wd && !date) {
+    const target = WEEKDAYS[fold(wd[1])];
+    take(wd.index, wd.index + wd[0].length, addDays(today, (target - today.weekday + 7) % 7));
+  }
+
   return { date, rest };
+}
+
+function takeStatus(text: string): { status?: "draft" | "confirmed"; rest: string } {
+  const draft = /\b(?:entwurf|vorlaeufig|vorläufig|unverbindlich|bozza|provvisorio)\b/i.exec(text);
+  if (draft) return { status: "draft", rest: consume(text, draft.index, draft.index + draft[0].length) };
+  const confirmed = /\b(?:bestaetigt|bestätigt|fix|confermato)\b/i.exec(text);
+  if (confirmed) return { status: "confirmed", rest: consume(text, confirmed.index, confirmed.index + confirmed[0].length) };
+  return { rest: text };
+}
+
+const REMINDER_WORDS: Record<string, number> = { einen: 1, ein: 1, eine: 1, zwei: 2, drei: 3, vier: 4, fuenf: 5, sieben: 7 };
+
+/** "Erinnerung 2 Tage vorher, Wetterlage checken" -> reminder date relative to the appointment date plus text. */
+function takeReminder(text: string, appointmentDate?: string): { date?: string; text?: string; rest: string } {
+  const m = /\b(?:erinnerung|erinnere\s+mich|reminder|promemoria)\b\s*[:,]?\s*(?:(\d{1,2}|einen|ein|eine|zwei|drei|vier|fuenf|fünf|sieben)\s+(tage?|wochen?)\s+(?:vorher|davor|zuvor|vor\s+dem\s+termin)|am\s+vortag|einen\s+tag\s+vorher)?\s*[:,]?\s*([^,.;]*)/i.exec(text);
+  if (!m) return { rest: text };
+  const rest = consume(text, m.index, m.index + m[0].length);
+  let days: number | undefined;
+  if (m[1] && m[2]) {
+    const amount = /^\d+$/.test(m[1]) ? Number(m[1]) : REMINDER_WORDS[fold(m[1])] ?? 1;
+    days = /woche/i.test(m[2]) ? amount * 7 : amount;
+  } else if (/vortag|einen\s+tag\s+vorher/i.test(m[0])) {
+    days = 1;
+  }
+  const reminderText = (m[3] ?? "").trim().replace(/\s+/g, " ") || undefined;
+  if (days === undefined || !appointmentDate) return { text: reminderText, rest };
+  const [y, mo, d] = appointmentDate.split("-").map(Number);
+  if (!y || !mo || !d) return { text: reminderText, rest };
+  const next = addDays({ year: y, month: mo, day: d }, -days);
+  return { date: dateKey(next.year, next.month, next.day), text: reminderText, rest };
+}
+
+function validDate(value: string | null | undefined): string | undefined {
+  return value && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : undefined;
+}
+
+function validTime(value: string | null | undefined): string | undefined {
+  if (!value || !/^\d{1,2}:\d{1,2}$/.test(value)) return undefined;
+  const [h, m] = value.split(":").map(Number);
+  return h !== undefined && m !== undefined && h <= 23 && m <= 59 ? `${pad(h)}:${pad(m)}` : undefined;
 }
 
 function titleName(parts: string[]): string {
@@ -586,6 +636,11 @@ export interface ExtractedIntent {
   lessonTypeName?: string | null;
   resourceName?: string | null;
   customerName?: string | null;
+  customerNames?: string[] | null;
+  status?: string | null;
+  reminderDate?: string | null;
+  reminderTime?: string | null;
+  reminderText?: string | null;
   phone?: string | null;
   note?: string | null;
 }
@@ -603,16 +658,28 @@ export function resolveExtractedIntent(
   const fieldConfidence: Record<string, number> = {};
   const questions: ClarifyingQuestion[] = [];
 
-  if (extraction.date && /^\d{4}-\d{2}-\d{2}$/.test(extraction.date)) {
-    parsed.date = extraction.date;
+  const date = validDate(extraction.date);
+  if (date) {
+    parsed.date = date;
     fieldConfidence.date = 0.9;
   }
-  if (extraction.time && /^\d{1,2}:\d{1,2}$/.test(extraction.time)) {
-    const [h, m] = extraction.time.split(":").map(Number);
-    if (h !== undefined && m !== undefined && h <= 23 && m <= 59) {
-      parsed.time = `${pad(h)}:${pad(m)}`;
-      fieldConfidence.time = 0.9;
-    }
+  const time = validTime(extraction.time);
+  if (time) {
+    parsed.time = time;
+    fieldConfidence.time = 0.9;
+  }
+  if (extraction.status === "draft" || extraction.status === "confirmed") {
+    parsed.status = extraction.status;
+  }
+  const reminderDate = validDate(extraction.reminderDate);
+  const reminderText = extraction.reminderText?.trim();
+  if (reminderDate || reminderText) {
+    parsed.reminderDate = reminderDate;
+    parsed.reminderTime = validTime(extraction.reminderTime);
+    parsed.reminderText = reminderText || undefined;
+    // A reminder only exists for drafts in this app.
+    if (!parsed.status) parsed.status = "draft";
+    fieldConfidence.reminderDate = reminderDate ? 0.85 : 0;
   }
   const duration = extraction.durationMinutes;
   if (typeof duration === "number" && Number.isFinite(duration) && duration > 0 && duration <= 24 * 60) {
@@ -672,7 +739,11 @@ export function resolveExtractedIntent(
     }
   }
 
-  const customerQuery = extraction.customerName?.trim();
+  const customerList = [...(extraction.customerNames ?? []), extraction.customerName ?? ""]
+    .map((name) => name.trim())
+    .filter((name, index, all) => name && all.indexOf(name) === index);
+  const customerQuery = customerList[0];
+  if (customerList.length > 1) parsed.additionalCustomerNames = customerList.slice(1);
   if (customerQuery) {
     const { items, fuzzy } = matchByName(catalog.customers, customerQuery, (item) => item.displayName);
     const single = items.length === 1 ? items[0] : undefined;
@@ -702,9 +773,12 @@ export function resolveExtractedIntent(
     }
   }
 
-  if (extraction.note?.trim()) {
-    parsed.note = extraction.note.trim();
+  const noteParts = [extraction.note?.trim() ?? ""];
+  if (parsed.additionalCustomerNames?.length) {
+    noteParts.push(`Weitere Passagiere: ${parsed.additionalCustomerNames.join(", ")}`);
   }
+  const note = noteParts.filter(Boolean).join(" · ");
+  if (note) parsed.note = note;
 
   applyAnswers(parsed, catalog, questions, fieldConfidence, answers);
 
@@ -756,6 +830,19 @@ export function parseAppointmentIntent(
     fieldConfidence.durationMinutes = 0.9;
   }
 
+  const status = takeStatus(rest);
+  rest = status.rest;
+  if (status.status) parsed.status = status.status;
+
+  const reminder = takeReminder(rest, parsed.date);
+  rest = reminder.rest;
+  if (reminder.date || reminder.text) {
+    parsed.reminderDate = reminder.date;
+    parsed.reminderText = reminder.text;
+    if (!parsed.status) parsed.status = "draft";
+    fieldConfidence.reminderDate = reminder.date ? 0.85 : 0;
+  }
+
   const passenger = takeLabeledName(rest, PASSENGER_RE);
   rest = passenger.rest;
   if (passenger.name) {
@@ -802,9 +889,10 @@ export function parseAppointmentIntent(
   const teacherHits = labeledTeacher
     ? labeledTeacher.items
     : findInText(catalog.teachers, rest, (item) => item.displayName);
-  if (teacherHits.length === 1) {
-    addTeacher(parsed, teacherHits[0], fieldConfidence, labeledTeacher ? (labeledTeacher.fuzzy ? 0.75 : 0.92) : 0.82);
-    rest = stripName(rest, teacherHits[0].displayName);
+  const onlyTeacher = teacherHits.length === 1 ? teacherHits[0] : undefined;
+  if (onlyTeacher) {
+    addTeacher(parsed, onlyTeacher, fieldConfidence, labeledTeacher ? (labeledTeacher.fuzzy ? 0.75 : 0.92) : 0.82);
+    rest = stripName(rest, onlyTeacher.displayName);
     // "Pilot Sepp und Martin Huber": further staff named alongside the labeled one join the appointment.
     if (labeledTeacher) {
       for (const extra of unambiguousTeachers(catalog.teachers, rest)) {
@@ -814,6 +902,13 @@ export function parseAppointmentIntent(
       }
     }
   } else if (teacherHits.length > 1) {
+    // "Pilot Martin und Martin Gasser": assign the fully named one, ask about the bare first name.
+    if (labeledTeacher) {
+      for (const extra of unambiguousTeachers(catalog.teachers, rest)) {
+        addTeacher(parsed, extra, fieldConfidence, 0.8);
+        rest = stripName(rest, extra.displayName);
+      }
+    }
     questions.push({
       id: "teacher",
       prompt: `Welcher „${teacherLabel.name || catalog.teacherLabel}“ ist gemeint?`,
@@ -825,12 +920,20 @@ export function parseAppointmentIntent(
 
   applyAnswers(parsed, catalog, questions, fieldConfidence, answers);
 
-  const leftover = rest.replace(/\s+/g, " ").trim();
-  const leftoverTokens = leftover
-    .split(" ")
-    .map((t) => fold(t.replace(/[^\p{L}\p{N}-]+/gu, "")))
-    .filter((t) => t && !STOP.has(t) && !NAME_STOP.has(t) && t.length > 1);
-  if (leftoverTokens.length) parsed.note = leftover;
+  // Keep only segments with real content; drop filler left behind by consumed fields ("Termin ist doch am ,").
+  const isFiller = (t: string) => !t || STOP.has(t) || NAME_STOP.has(t) || t.length <= 1;
+  const segments = rest
+    .split(/[,.;]+/)
+    .map((segment) => segment.replace(/\s+/g, " ").trim())
+    .map((segment) => {
+      const words = segment.split(" ");
+      while (words.length && isFiller(fold(words[0]!.replace(/[^\p{L}\p{N}-]+/gu, "")))) words.shift();
+      return words.join(" ");
+    })
+    .filter((segment) =>
+      segment.split(" ").some((t) => !isFiller(fold(t.replace(/[^\p{L}\p{N}-]+/gu, "")))),
+    );
+  if (segments.length) parsed.note = segments.join(", ");
 
   return {
     parsed,
