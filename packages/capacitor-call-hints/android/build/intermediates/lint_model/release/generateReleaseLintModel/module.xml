@@ -1,6 +1,6 @@
 <lint-module
     format="1"
-    dir="/Users/martin.stofner/WSN/alpiplan/apps/mobile-shell/node_modules/@alpiplan/capacitor-call-hints/android"
+    dir="/Users/martin.stofner/WSN/alpiplan/app.alpiplan.com/apps/mobile-shell/node_modules/@alpiplan/capacitor-call-hints/android"
     name=":alpiplan-capacitor-call-hints"
     type="LIBRARY"
     maven="android:alpiplan-capacitor-call-hints:unspecified"

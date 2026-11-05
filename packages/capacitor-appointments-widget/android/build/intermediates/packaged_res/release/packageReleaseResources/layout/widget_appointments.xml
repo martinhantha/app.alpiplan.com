@@ -72,6 +72,8 @@
                     android:id="@+id/item_time_0"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
+                    android:ellipsize="end"
+                    android:maxLines="1"
                     android:textColor="#6B7280"
                     android:textSize="11sp" />
 
@@ -143,6 +145,8 @@
                     android:id="@+id/item_time_1"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
+                    android:ellipsize="end"
+                    android:maxLines="1"
                     android:textColor="#6B7280"
                     android:textSize="11sp" />
 
@@ -214,6 +218,8 @@
                     android:id="@+id/item_time_2"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
+                    android:ellipsize="end"
+                    android:maxLines="1"
                     android:textColor="#6B7280"
                     android:textSize="11sp" />
 
@@ -254,6 +260,207 @@
 
             <TextView
                 android:id="@+id/item_complete_2"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="3dp"
+                android:background="@drawable/widget_button_success"
+                android:gravity="center"
+                android:minWidth="28dp"
+                android:paddingHorizontal="8dp"
+                android:paddingVertical="5dp"
+                android:text="@string/widget_done"
+                android:textColor="#166534"
+                android:textSize="10sp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/widget_row_3"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingVertical="4dp">
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+                <TextView
+                    android:id="@+id/item_time_3"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:textColor="#6B7280"
+                    android:textSize="11sp" />
+                <TextView
+                    android:id="@+id/item_title_3"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:textColor="#111827"
+                    android:textSize="13sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+            <TextView
+                android:id="@+id/item_call_3"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="3dp"
+                android:background="@drawable/widget_button_neutral"
+                android:paddingHorizontal="5dp"
+                android:paddingVertical="4dp"
+                android:text="@string/widget_call"
+                android:textColor="#374151"
+                android:textSize="10sp" />
+            <TextView
+                android:id="@+id/item_whatsapp_3"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="3dp"
+                android:background="@drawable/widget_button_whatsapp"
+                android:paddingHorizontal="5dp"
+                android:paddingVertical="4dp"
+                android:text="@string/widget_whatsapp"
+                android:textColor="#166534"
+                android:textSize="10sp" />
+            <TextView
+                android:id="@+id/item_complete_3"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="3dp"
+                android:background="@drawable/widget_button_success"
+                android:gravity="center"
+                android:minWidth="28dp"
+                android:paddingHorizontal="8dp"
+                android:paddingVertical="5dp"
+                android:text="@string/widget_done"
+                android:textColor="#166534"
+                android:textSize="10sp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/widget_row_4"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingVertical="4dp">
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+                <TextView
+                    android:id="@+id/item_time_4"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:textColor="#6B7280"
+                    android:textSize="11sp" />
+                <TextView
+                    android:id="@+id/item_title_4"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:textColor="#111827"
+                    android:textSize="13sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+            <TextView
+                android:id="@+id/item_call_4"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="3dp"
+                android:background="@drawable/widget_button_neutral"
+                android:paddingHorizontal="5dp"
+                android:paddingVertical="4dp"
+                android:text="@string/widget_call"
+                android:textColor="#374151"
+                android:textSize="10sp" />
+            <TextView
+                android:id="@+id/item_whatsapp_4"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="3dp"
+                android:background="@drawable/widget_button_whatsapp"
+                android:paddingHorizontal="5dp"
+                android:paddingVertical="4dp"
+                android:text="@string/widget_whatsapp"
+                android:textColor="#166534"
+                android:textSize="10sp" />
+            <TextView
+                android:id="@+id/item_complete_4"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="3dp"
+                android:background="@drawable/widget_button_success"
+                android:gravity="center"
+                android:minWidth="28dp"
+                android:paddingHorizontal="8dp"
+                android:paddingVertical="5dp"
+                android:text="@string/widget_done"
+                android:textColor="#166534"
+                android:textSize="10sp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/widget_row_5"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingVertical="4dp">
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+                <TextView
+                    android:id="@+id/item_time_5"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:textColor="#6B7280"
+                    android:textSize="11sp" />
+                <TextView
+                    android:id="@+id/item_title_5"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:textColor="#111827"
+                    android:textSize="13sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+            <TextView
+                android:id="@+id/item_call_5"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="3dp"
+                android:background="@drawable/widget_button_neutral"
+                android:paddingHorizontal="5dp"
+                android:paddingVertical="4dp"
+                android:text="@string/widget_call"
+                android:textColor="#374151"
+                android:textSize="10sp" />
+            <TextView
+                android:id="@+id/item_whatsapp_5"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="3dp"
+                android:background="@drawable/widget_button_whatsapp"
+                android:paddingHorizontal="5dp"
+                android:paddingVertical="4dp"
+                android:text="@string/widget_whatsapp"
+                android:textColor="#166534"
+                android:textSize="10sp" />
+            <TextView
+                android:id="@+id/item_complete_5"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="3dp"

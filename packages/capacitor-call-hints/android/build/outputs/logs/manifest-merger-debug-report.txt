@@ -1,76 +1,76 @@
 -- Merging decision tree log ---
 manifest
-ADDED from /Users/martin.stofner/WSN/alpiplan/apps/mobile-shell/node_modules/@alpiplan/capacitor-call-hints/android/src/main/AndroidManifest.xml:1:1-28:12
-INJECTED from /Users/martin.stofner/WSN/alpiplan/apps/mobile-shell/node_modules/@alpiplan/capacitor-call-hints/android/src/main/AndroidManifest.xml:1:1-28:12
+ADDED from /Users/martin.stofner/WSN/alpiplan/app.alpiplan.com/apps/mobile-shell/node_modules/@alpiplan/capacitor-call-hints/android/src/main/AndroidManifest.xml:1:1-28:12
+INJECTED from /Users/martin.stofner/WSN/alpiplan/app.alpiplan.com/apps/mobile-shell/node_modules/@alpiplan/capacitor-call-hints/android/src/main/AndroidManifest.xml:1:1-28:12
 	package
-		INJECTED from /Users/martin.stofner/WSN/alpiplan/apps/mobile-shell/node_modules/@alpiplan/capacitor-call-hints/android/src/main/AndroidManifest.xml
+		INJECTED from /Users/martin.stofner/WSN/alpiplan/app.alpiplan.com/apps/mobile-shell/node_modules/@alpiplan/capacitor-call-hints/android/src/main/AndroidManifest.xml
 	xmlns:android
-		ADDED from /Users/martin.stofner/WSN/alpiplan/apps/mobile-shell/node_modules/@alpiplan/capacitor-call-hints/android/src/main/AndroidManifest.xml:1:11-69
+		ADDED from /Users/martin.stofner/WSN/alpiplan/app.alpiplan.com/apps/mobile-shell/node_modules/@alpiplan/capacitor-call-hints/android/src/main/AndroidManifest.xml:1:11-69
 uses-permission#android.permission.RECORD_AUDIO
-ADDED from /Users/martin.stofner/WSN/alpiplan/apps/mobile-shell/node_modules/@alpiplan/capacitor-call-hints/android/src/main/AndroidManifest.xml:2:5-71
+ADDED from /Users/martin.stofner/WSN/alpiplan/app.alpiplan.com/apps/mobile-shell/node_modules/@alpiplan/capacitor-call-hints/android/src/main/AndroidManifest.xml:2:5-71
 	android:name
-		ADDED from /Users/martin.stofner/WSN/alpiplan/apps/mobile-shell/node_modules/@alpiplan/capacitor-call-hints/android/src/main/AndroidManifest.xml:2:22-68
+		ADDED from /Users/martin.stofner/WSN/alpiplan/app.alpiplan.com/apps/mobile-shell/node_modules/@alpiplan/capacitor-call-hints/android/src/main/AndroidManifest.xml:2:22-68
 uses-permission#android.permission.INTERNET
-ADDED from /Users/martin.stofner/WSN/alpiplan/apps/mobile-shell/node_modules/@alpiplan/capacitor-call-hints/android/src/main/AndroidManifest.xml:3:5-67
+ADDED from /Users/martin.stofner/WSN/alpiplan/app.alpiplan.com/apps/mobile-shell/node_modules/@alpiplan/capacitor-call-hints/android/src/main/AndroidManifest.xml:3:5-67
 	android:name
-		ADDED from /Users/martin.stofner/WSN/alpiplan/apps/mobile-shell/node_modules/@alpiplan/capacitor-call-hints/android/src/main/AndroidManifest.xml:3:22-64
+		ADDED from /Users/martin.stofner/WSN/alpiplan/app.alpiplan.com/apps/mobile-shell/node_modules/@alpiplan/capacitor-call-hints/android/src/main/AndroidManifest.xml:3:22-64
 uses-permission#android.permission.ACCESS_NETWORK_STATE
-ADDED from /Users/martin.stofner/WSN/alpiplan/apps/mobile-shell/node_modules/@alpiplan/capacitor-call-hints/android/src/main/AndroidManifest.xml:4:5-79
+ADDED from /Users/martin.stofner/WSN/alpiplan/app.alpiplan.com/apps/mobile-shell/node_modules/@alpiplan/capacitor-call-hints/android/src/main/AndroidManifest.xml:4:5-79
 	android:name
-		ADDED from /Users/martin.stofner/WSN/alpiplan/apps/mobile-shell/node_modules/@alpiplan/capacitor-call-hints/android/src/main/AndroidManifest.xml:4:22-76
+		ADDED from /Users/martin.stofner/WSN/alpiplan/app.alpiplan.com/apps/mobile-shell/node_modules/@alpiplan/capacitor-call-hints/android/src/main/AndroidManifest.xml:4:22-76
 uses-permission#android.permission.MODIFY_AUDIO_SETTINGS
-ADDED from /Users/martin.stofner/WSN/alpiplan/apps/mobile-shell/node_modules/@alpiplan/capacitor-call-hints/android/src/main/AndroidManifest.xml:5:5-80
+ADDED from /Users/martin.stofner/WSN/alpiplan/app.alpiplan.com/apps/mobile-shell/node_modules/@alpiplan/capacitor-call-hints/android/src/main/AndroidManifest.xml:5:5-80
 	android:name
-		ADDED from /Users/martin.stofner/WSN/alpiplan/apps/mobile-shell/node_modules/@alpiplan/capacitor-call-hints/android/src/main/AndroidManifest.xml:5:22-77
+		ADDED from /Users/martin.stofner/WSN/alpiplan/app.alpiplan.com/apps/mobile-shell/node_modules/@alpiplan/capacitor-call-hints/android/src/main/AndroidManifest.xml:5:22-77
 uses-permission#android.permission.READ_CONTACTS
-ADDED from /Users/martin.stofner/WSN/alpiplan/apps/mobile-shell/node_modules/@alpiplan/capacitor-call-hints/android/src/main/AndroidManifest.xml:6:5-72
+ADDED from /Users/martin.stofner/WSN/alpiplan/app.alpiplan.com/apps/mobile-shell/node_modules/@alpiplan/capacitor-call-hints/android/src/main/AndroidManifest.xml:6:5-72
 	android:name
-		ADDED from /Users/martin.stofner/WSN/alpiplan/apps/mobile-shell/node_modules/@alpiplan/capacitor-call-hints/android/src/main/AndroidManifest.xml:6:22-69
+		ADDED from /Users/martin.stofner/WSN/alpiplan/app.alpiplan.com/apps/mobile-shell/node_modules/@alpiplan/capacitor-call-hints/android/src/main/AndroidManifest.xml:6:22-69
 uses-permission#android.permission.WRITE_CONTACTS
-ADDED from /Users/martin.stofner/WSN/alpiplan/apps/mobile-shell/node_modules/@alpiplan/capacitor-call-hints/android/src/main/AndroidManifest.xml:7:5-73
+ADDED from /Users/martin.stofner/WSN/alpiplan/app.alpiplan.com/apps/mobile-shell/node_modules/@alpiplan/capacitor-call-hints/android/src/main/AndroidManifest.xml:7:5-73
 	android:name
-		ADDED from /Users/martin.stofner/WSN/alpiplan/apps/mobile-shell/node_modules/@alpiplan/capacitor-call-hints/android/src/main/AndroidManifest.xml:7:22-70
+		ADDED from /Users/martin.stofner/WSN/alpiplan/app.alpiplan.com/apps/mobile-shell/node_modules/@alpiplan/capacitor-call-hints/android/src/main/AndroidManifest.xml:7:22-70
 uses-permission#android.permission.POST_NOTIFICATIONS
-ADDED from /Users/martin.stofner/WSN/alpiplan/apps/mobile-shell/node_modules/@alpiplan/capacitor-call-hints/android/src/main/AndroidManifest.xml:8:5-77
+ADDED from /Users/martin.stofner/WSN/alpiplan/app.alpiplan.com/apps/mobile-shell/node_modules/@alpiplan/capacitor-call-hints/android/src/main/AndroidManifest.xml:8:5-77
 	android:name
-		ADDED from /Users/martin.stofner/WSN/alpiplan/apps/mobile-shell/node_modules/@alpiplan/capacitor-call-hints/android/src/main/AndroidManifest.xml:8:22-74
+		ADDED from /Users/martin.stofner/WSN/alpiplan/app.alpiplan.com/apps/mobile-shell/node_modules/@alpiplan/capacitor-call-hints/android/src/main/AndroidManifest.xml:8:22-74
 queries
-ADDED from /Users/martin.stofner/WSN/alpiplan/apps/mobile-shell/node_modules/@alpiplan/capacitor-call-hints/android/src/main/AndroidManifest.xml:10:5-16:15
+ADDED from /Users/martin.stofner/WSN/alpiplan/app.alpiplan.com/apps/mobile-shell/node_modules/@alpiplan/capacitor-call-hints/android/src/main/AndroidManifest.xml:10:5-16:15
 intent#action:name:android.speech.RecognitionService
-ADDED from /Users/martin.stofner/WSN/alpiplan/apps/mobile-shell/node_modules/@alpiplan/capacitor-call-hints/android/src/main/AndroidManifest.xml:11:9-13:18
+ADDED from /Users/martin.stofner/WSN/alpiplan/app.alpiplan.com/apps/mobile-shell/node_modules/@alpiplan/capacitor-call-hints/android/src/main/AndroidManifest.xml:11:9-13:18
 action#android.speech.RecognitionService
-ADDED from /Users/martin.stofner/WSN/alpiplan/apps/mobile-shell/node_modules/@alpiplan/capacitor-call-hints/android/src/main/AndroidManifest.xml:12:13-72
+ADDED from /Users/martin.stofner/WSN/alpiplan/app.alpiplan.com/apps/mobile-shell/node_modules/@alpiplan/capacitor-call-hints/android/src/main/AndroidManifest.xml:12:13-72
 	android:name
-		ADDED from /Users/martin.stofner/WSN/alpiplan/apps/mobile-shell/node_modules/@alpiplan/capacitor-call-hints/android/src/main/AndroidManifest.xml:12:21-69
+		ADDED from /Users/martin.stofner/WSN/alpiplan/app.alpiplan.com/apps/mobile-shell/node_modules/@alpiplan/capacitor-call-hints/android/src/main/AndroidManifest.xml:12:21-69
 package#com.whatsapp
-ADDED from /Users/martin.stofner/WSN/alpiplan/apps/mobile-shell/node_modules/@alpiplan/capacitor-call-hints/android/src/main/AndroidManifest.xml:14:9-48
+ADDED from /Users/martin.stofner/WSN/alpiplan/app.alpiplan.com/apps/mobile-shell/node_modules/@alpiplan/capacitor-call-hints/android/src/main/AndroidManifest.xml:14:9-48
 	android:name
-		ADDED from /Users/martin.stofner/WSN/alpiplan/apps/mobile-shell/node_modules/@alpiplan/capacitor-call-hints/android/src/main/AndroidManifest.xml:14:18-45
+		ADDED from /Users/martin.stofner/WSN/alpiplan/app.alpiplan.com/apps/mobile-shell/node_modules/@alpiplan/capacitor-call-hints/android/src/main/AndroidManifest.xml:14:18-45
 package#com.whatsapp.w4b
-ADDED from /Users/martin.stofner/WSN/alpiplan/apps/mobile-shell/node_modules/@alpiplan/capacitor-call-hints/android/src/main/AndroidManifest.xml:15:9-52
+ADDED from /Users/martin.stofner/WSN/alpiplan/app.alpiplan.com/apps/mobile-shell/node_modules/@alpiplan/capacitor-call-hints/android/src/main/AndroidManifest.xml:15:9-52
 	android:name
-		ADDED from /Users/martin.stofner/WSN/alpiplan/apps/mobile-shell/node_modules/@alpiplan/capacitor-call-hints/android/src/main/AndroidManifest.xml:15:18-49
+		ADDED from /Users/martin.stofner/WSN/alpiplan/app.alpiplan.com/apps/mobile-shell/node_modules/@alpiplan/capacitor-call-hints/android/src/main/AndroidManifest.xml:15:18-49
 application
-ADDED from /Users/martin.stofner/WSN/alpiplan/apps/mobile-shell/node_modules/@alpiplan/capacitor-call-hints/android/src/main/AndroidManifest.xml:18:5-27:19
+ADDED from /Users/martin.stofner/WSN/alpiplan/app.alpiplan.com/apps/mobile-shell/node_modules/@alpiplan/capacitor-call-hints/android/src/main/AndroidManifest.xml:18:5-27:19
 service#at.alpiplan.plugins.callhints.CallerIdService
-ADDED from /Users/martin.stofner/WSN/alpiplan/apps/mobile-shell/node_modules/@alpiplan/capacitor-call-hints/android/src/main/AndroidManifest.xml:19:9-26:19
+ADDED from /Users/martin.stofner/WSN/alpiplan/app.alpiplan.com/apps/mobile-shell/node_modules/@alpiplan/capacitor-call-hints/android/src/main/AndroidManifest.xml:19:9-26:19
 	android:exported
-		ADDED from /Users/martin.stofner/WSN/alpiplan/apps/mobile-shell/node_modules/@alpiplan/capacitor-call-hints/android/src/main/AndroidManifest.xml:21:13-36
+		ADDED from /Users/martin.stofner/WSN/alpiplan/app.alpiplan.com/apps/mobile-shell/node_modules/@alpiplan/capacitor-call-hints/android/src/main/AndroidManifest.xml:21:13-36
 	android:permission
-		ADDED from /Users/martin.stofner/WSN/alpiplan/apps/mobile-shell/node_modules/@alpiplan/capacitor-call-hints/android/src/main/AndroidManifest.xml:22:13-75
+		ADDED from /Users/martin.stofner/WSN/alpiplan/app.alpiplan.com/apps/mobile-shell/node_modules/@alpiplan/capacitor-call-hints/android/src/main/AndroidManifest.xml:22:13-75
 	android:name
-		ADDED from /Users/martin.stofner/WSN/alpiplan/apps/mobile-shell/node_modules/@alpiplan/capacitor-call-hints/android/src/main/AndroidManifest.xml:20:13-73
+		ADDED from /Users/martin.stofner/WSN/alpiplan/app.alpiplan.com/apps/mobile-shell/node_modules/@alpiplan/capacitor-call-hints/android/src/main/AndroidManifest.xml:20:13-73
 intent-filter#action:name:android.telecom.CallScreeningService
-ADDED from /Users/martin.stofner/WSN/alpiplan/apps/mobile-shell/node_modules/@alpiplan/capacitor-call-hints/android/src/main/AndroidManifest.xml:23:13-25:29
+ADDED from /Users/martin.stofner/WSN/alpiplan/app.alpiplan.com/apps/mobile-shell/node_modules/@alpiplan/capacitor-call-hints/android/src/main/AndroidManifest.xml:23:13-25:29
 action#android.telecom.CallScreeningService
-ADDED from /Users/martin.stofner/WSN/alpiplan/apps/mobile-shell/node_modules/@alpiplan/capacitor-call-hints/android/src/main/AndroidManifest.xml:24:17-79
+ADDED from /Users/martin.stofner/WSN/alpiplan/app.alpiplan.com/apps/mobile-shell/node_modules/@alpiplan/capacitor-call-hints/android/src/main/AndroidManifest.xml:24:17-79
 	android:name
-		ADDED from /Users/martin.stofner/WSN/alpiplan/apps/mobile-shell/node_modules/@alpiplan/capacitor-call-hints/android/src/main/AndroidManifest.xml:24:25-76
+		ADDED from /Users/martin.stofner/WSN/alpiplan/app.alpiplan.com/apps/mobile-shell/node_modules/@alpiplan/capacitor-call-hints/android/src/main/AndroidManifest.xml:24:25-76
 uses-sdk
-INJECTED from /Users/martin.stofner/WSN/alpiplan/apps/mobile-shell/node_modules/@alpiplan/capacitor-call-hints/android/src/main/AndroidManifest.xml reason: use-sdk injection requested
-INJECTED from /Users/martin.stofner/WSN/alpiplan/apps/mobile-shell/node_modules/@alpiplan/capacitor-call-hints/android/src/main/AndroidManifest.xml
-INJECTED from /Users/martin.stofner/WSN/alpiplan/apps/mobile-shell/node_modules/@alpiplan/capacitor-call-hints/android/src/main/AndroidManifest.xml
+INJECTED from /Users/martin.stofner/WSN/alpiplan/app.alpiplan.com/apps/mobile-shell/node_modules/@alpiplan/capacitor-call-hints/android/src/main/AndroidManifest.xml reason: use-sdk injection requested
+INJECTED from /Users/martin.stofner/WSN/alpiplan/app.alpiplan.com/apps/mobile-shell/node_modules/@alpiplan/capacitor-call-hints/android/src/main/AndroidManifest.xml
+INJECTED from /Users/martin.stofner/WSN/alpiplan/app.alpiplan.com/apps/mobile-shell/node_modules/@alpiplan/capacitor-call-hints/android/src/main/AndroidManifest.xml
 	android:targetSdkVersion
-		INJECTED from /Users/martin.stofner/WSN/alpiplan/apps/mobile-shell/node_modules/@alpiplan/capacitor-call-hints/android/src/main/AndroidManifest.xml
+		INJECTED from /Users/martin.stofner/WSN/alpiplan/app.alpiplan.com/apps/mobile-shell/node_modules/@alpiplan/capacitor-call-hints/android/src/main/AndroidManifest.xml
 	android:minSdkVersion
-		INJECTED from /Users/martin.stofner/WSN/alpiplan/apps/mobile-shell/node_modules/@alpiplan/capacitor-call-hints/android/src/main/AndroidManifest.xml
+		INJECTED from /Users/martin.stofner/WSN/alpiplan/app.alpiplan.com/apps/mobile-shell/node_modules/@alpiplan/capacitor-call-hints/android/src/main/AndroidManifest.xml
