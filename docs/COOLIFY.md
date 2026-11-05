@@ -61,6 +61,18 @@ git push -u origin develop
 
 In Coolify den Produktions-Branch auf `main` stellen. Startet Coolify den Build nicht von selbst, denselben Commit mit `pnpm deploy:local` ausliefern.
 
+### Alles in einem Schritt (`pnpm deploy:fast`)
+
+[`scripts/deploy-fast.mjs`](../scripts/deploy-fast.mjs) kapselt den lokalen Weg für Hotfixes: prüft den Git-Stand und pusht den Branch bei Bedarf, startet Docker Desktop, falls es nicht läuft, ruft `deploy-local` mit den vorbelegten Contexts auf (`DEPLOY_CONTEXT`, Standard `avelom.cloud`; `DEPLOY_BUILD_CONTEXT`, Standard `desktop-linux`) und zeigt danach die Push-, Assistant- und Fehlerzeilen des neuen Containers.
+
+```bash
+pnpm deploy:fast --dry-run   # nur bauen und prüfen
+pnpm deploy:fast             # bauen, hochladen, neu starten, Logs zeigen
+pnpm deploy:fast --migrate   # zusätzlich Migrationen vor dem Neustart
+```
+
+Es wird ausschließlich der Container der Anwendung `web-alpiplan` neu gestartet (`--no-deps`), andere Coolify-Anwendungen sowie Postgres und Redis bleiben unberührt.
+
 ### Lokal bauen statt am Server (`pnpm deploy:local`)
 
 Für den Fall, dass der Server-Build zu schwer ist: [`scripts/deploy-local.mjs`](../scripts/deploy-local.mjs) baut das Web-Image lokal für die Server-Architektur, lädt es über den Docker-Context (SSH) auf den Server und startet den bestehenden Coolify-Container damit neu. In Coolify muss nichts umgestellt werden.

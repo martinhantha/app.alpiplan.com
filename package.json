@@ -17,6 +17,7 @@
     "dev:mobile": "pnpm --filter @alpiplan/mobile-shell cap:open:android",
     "deploy:main": "node scripts/deploy.mjs",
     "deploy:local": "node scripts/deploy-local.mjs",
+    "deploy:fast": "node scripts/deploy-fast.mjs",
     "import:flights": "tsx scripts/import-flights.ts",
     "import:mongo": "tsx scripts/import_from_mongo.ts",
     "test-skischule:seed": "tsx scripts/seed-test-skischule.ts",
