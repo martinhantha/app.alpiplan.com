@@ -583,6 +583,17 @@
     "assistantHintsHint": "Eigene Begriffe, Abkürzungen und Spitznamen, z. B. „Tandem = Passagierflug“, „Sepp = Josef Huber“.",
     "assistantHintsPlaceholder": "Ein Hinweis pro Zeile …",
     "operatorOnly": "Wird vom Betreiber (Superadmin) pro Mandant freigeschaltet.",
+    "pushRegistration": {
+      "title": "Push-Registrierung dieses Geräts",
+      "idle": "Noch nicht versucht. Die App registriert sich beim Start automatisch.",
+      "unsupported": "Nur in der Android- oder iOS-App.",
+      "registering": "Registrierung läuft …",
+      "ok": "Gerät ist beim Server registriert. Erinnerungen und Briefing kommen hier an.",
+      "permissionDenied": "Gerät registriert, aber Benachrichtigungen sind in den System-Einstellungen nicht erlaubt.",
+      "noToken": "Die App hat kein Push-Token erhalten. Google-Play-Dienste prüfen bzw. App neu installieren.",
+      "error": "Registrierung am Server fehlgeschlagen",
+      "button": "Jetzt registrieren"
+    },
     "autoCompleteTitle": "Termine automatisch als erledigt markieren",
     "autoCompleteHint": "Gilt für alle Benutzer. Offene Termine werden erledigt, sobald das Ende plus die angegebene Zeit vorbei ist.",
     "autoCompleteMinutes": "Minuten nach Terminende",

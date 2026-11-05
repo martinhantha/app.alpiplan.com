@@ -5,6 +5,7 @@ import { isCallHintsOptIn } from "@alpiplan/device-capabilities";
 import { useWhatsAppPreference } from "../composables/useWhatsAppPreference";
 import { DEFAULT_BRIEFING_MINUTES, formatBriefingTime, parseBriefingTime } from "../utils/rome-time";
 import { normalizeUiScale, type UiScale } from "../utils/ui-scale";
+import { nativePushRegistration, registerNativePushToken } from "../utils/push-registration";
 import { DEFAULT_SPEECH_LANGUAGE, SPEECH_LANGUAGES } from "../utils/speech-languages";
 import {
   disableWebPush,
@@ -36,6 +37,8 @@ const {
   lastError: permissionsError,
   microphoneGranted,
   contactsGranted,
+  notificationsSupported,
+  notificationsGranted,
   allGranted,
   anyDenied,
   refreshStatus,
@@ -273,6 +276,31 @@ async function saveTenantSettings(patch: {
     tenantSettingsSaving.value = false;
   }
 }
+
+const pushRegistering = ref(false);
+async function registerPushNow() {
+  pushRegistering.value = true;
+  try {
+    await registerNativePushToken();
+    await refreshStatus();
+  } finally {
+    pushRegistering.value = false;
+  }
+}
+const pushRegistrationText = computed(() => {
+  const current = nativePushRegistration.value;
+  const key = {
+    idle: "idle",
+    unsupported: "unsupported",
+    registering: "registering",
+    ok: "ok",
+    "permission-denied": "permissionDenied",
+    "no-token": "noToken",
+    error: "error",
+  }[current.state];
+  const text = t(`settingsPage.pushRegistration.${key}`);
+  return current.state === "error" && current.message ? `${text} (${current.message})` : text;
+});
 
 function saveAssistantHints() {
   const next = assistantHintsLocal.value.trim();
@@ -763,7 +791,28 @@ onBeforeUnmount(() => {
                   {{ contactsGranted ? t("common.allowed") : t("common.denied") }}
                 </UBadge>
               </li>
+              <li v-if="notificationsSupported" class="flex items-center justify-between gap-3">
+                <span>{{ t("common.notifications") }}</span>
+                <UBadge :color="notificationsGranted ? 'success' : 'neutral'" variant="subtle">
+                  {{ notificationsGranted ? t("common.allowed") : t("common.denied") }}
+                </UBadge>
+              </li>
             </ul>
+            <div class="rounded-md border border-neutral-200 dark:border-neutral-800 p-3 space-y-2">
+              <p class="text-sm font-medium">{{ t("settingsPage.pushRegistration.title") }}</p>
+              <p class="text-xs text-neutral-500 break-words">{{ pushRegistrationText }}</p>
+              <UButton
+                type="button"
+                size="sm"
+                variant="soft"
+                color="neutral"
+                icon="i-lucide-bell-ring"
+                :loading="pushRegistering"
+                @click="registerPushNow"
+              >
+                {{ t("settingsPage.pushRegistration.button") }}
+              </UButton>
+            </div>
             <div class="flex flex-wrap gap-2">
               <UButton
                 type="button"

@@ -583,6 +583,17 @@
     "assistantHintsHint": "Termini propri, abbreviazioni e soprannomi, ad es. «Tandem = volo passeggeri», «Sepp = Josef Huber».",
     "assistantHintsPlaceholder": "Un'indicazione per riga…",
     "operatorOnly": "Viene attivato per cliente dal gestore (superadmin).",
+    "pushRegistration": {
+      "title": "Registrazione push di questo dispositivo",
+      "idle": "Non ancora tentata. L'app si registra all'avvio.",
+      "unsupported": "Solo nell'app Android o iOS.",
+      "registering": "Registrazione in corso…",
+      "ok": "Dispositivo registrato sul server. Promemoria e riepilogo arrivano qui.",
+      "permissionDenied": "Dispositivo registrato, ma le notifiche non sono consentite nelle impostazioni di sistema.",
+      "noToken": "L'app non ha ricevuto un token push. Controllare i servizi Google Play o reinstallare l'app.",
+      "error": "Registrazione sul server non riuscita",
+      "button": "Registra ora"
+    },
     "autoCompleteTitle": "Segna gli appuntamenti come fatti in automatico",
     "autoCompleteHint": "Vale per tutti. Gli appuntamenti aperti diventano fatti quando è passata la fine più il tempo indicato.",
     "autoCompleteMinutes": "Minuti dopo la fine dell’appuntamento",
