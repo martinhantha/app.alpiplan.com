@@ -21,5 +21,6 @@ export default defineEventHandler(async (event) => {
     create: { userId: session.user.id, token, platform },
     update: { userId: session.user.id, platform },
   });
+  console.info(`[push] token registered user=${session.user.id} platform=${platform}`);
   return { ok: true as const };
 });

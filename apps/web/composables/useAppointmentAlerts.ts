@@ -56,7 +56,12 @@ async function notifyOs(event: AppointmentLiveEvent, title: string, body: string
   }
 }
 
+/** Re-register the device at most this often when the app returns to the foreground. */
+const REGISTER_INTERVAL_MS = 10 * 60_000;
+
 export function useAppointmentAlerts() {
+  let lastDeviceRegistration = 0;
+  let visibilityBound = false;
   const { user, primaryTenant } = useAuth();
   const { device } = useDeviceCapabilities();
   const alert = ref<AppointmentLiveEvent | null>(null);
@@ -124,10 +129,26 @@ export function useAppointmentAlerts() {
         // Ignore keep-alives and malformed frames.
       }
     };
-    window.setTimeout(() => {
-      void registerNativePushToken();
-      void syncWebPushSubscription();
-    }, 2500);
+    lastDeviceRegistration = 0;
+    window.setTimeout(registerDevices, 2500);
+    if (!visibilityBound) {
+      document.addEventListener("visibilitychange", onVisible);
+      visibilityBound = true;
+    }
+  }
+
+  /** Register this device with the server; repeated on foreground so a removed row heals itself. */
+  function registerDevices() {
+    if (!user.value) return;
+    const now = Date.now();
+    if (now - lastDeviceRegistration < REGISTER_INTERVAL_MS) return;
+    lastDeviceRegistration = now;
+    void registerNativePushToken();
+    void syncWebPushSubscription();
+  }
+
+  function onVisible() {
+    if (document.visibilityState === "visible") registerDevices();
   }
 
   watch(
@@ -141,6 +162,10 @@ export function useAppointmentAlerts() {
   onUnmounted(() => {
     disconnect();
     dismiss();
+    if (visibilityBound) {
+      document.removeEventListener("visibilitychange", onVisible);
+      visibilityBound = false;
+    }
   });
 
   return { alert, dismiss, canAskNotifications, enableNotifications };
