@@ -209,17 +209,23 @@ public class AlpiplanDevicePlugin extends Plugin {
                         Object token = success ? taskClass.getMethod("getResult").invoke(completed) : null;
                         if (token != null) {
                             result.put("token", String.valueOf(token));
+                        } else {
+                            // Surface why FCM gave no token (SERVICE_NOT_AVAILABLE, FIS_AUTH_ERROR, ...).
+                            Object exception = taskClass.getMethod("getException").invoke(completed);
+                            result.put("error", exception == null ? "no token" : String.valueOf(exception));
                         }
-                    } catch (Exception ignored) {
-                        // Resolve empty so the web layer can keep using in-app alerts.
+                    } catch (Exception failure) {
+                        // Resolve with the reason so the web layer can show it; in-app alerts keep working.
+                        result.put("error", String.valueOf(failure));
                     }
                     call.resolve(result);
                     return null;
                 }
             );
             addListener.invoke(task, listener);
-        } catch (Throwable ignored) {
+        } catch (Throwable failure) {
             JSObject result = new JSObject();
+            result.put("error", "Firebase Messaging not available: " + failure);
             call.resolve(result);
         }
     }

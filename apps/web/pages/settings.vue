@@ -299,7 +299,9 @@ const pushRegistrationText = computed(() => {
     error: "error",
   }[current.state];
   const text = t(`settingsPage.pushRegistration.${key}`);
-  return current.state === "error" && current.message ? `${text} (${current.message})` : text;
+  return (current.state === "error" || current.state === "no-token") && current.message
+    ? `${text} (${current.message})`
+    : text;
 });
 
 function saveAssistantHints() {

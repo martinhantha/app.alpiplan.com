@@ -31,7 +31,8 @@ export interface AlpiplanDevicePlugin {
   openAppSettings(): Promise<void>;
   openWhatsApp(options: { phone: string; app?: "whatsapp" | "business" }): Promise<void>;
   showLocalNotification(options: { title: string; body: string; id?: string }): Promise<void>;
-  getPushToken(): Promise<{ token?: string | null }>;
+  /** `error` explains a missing token (e.g. SERVICE_NOT_AVAILABLE, FIS_AUTH_ERROR); older builds omit it. */
+  getPushToken(): Promise<{ token?: string | null; error?: string | null }>;
   /** `hints`: known names (staff, customers, types) used to bias recognition on Android 13+. */
   startSpeechRecognition(options?: { lang?: string; hints?: string[] }): Promise<void>;
   stopSpeechRecognition(): Promise<void>;

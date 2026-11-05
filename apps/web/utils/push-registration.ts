@@ -81,7 +81,7 @@ export async function registerNativePushToken(): Promise<NativePushRegistration>
     const result = await withTimeout(AlpiplanDevice.getPushToken(), 15_000, "push token");
     const token = result.token?.trim();
     if (!token) {
-      setState("no-token");
+      setState("no-token", (result as { error?: string | null }).error?.trim() || undefined);
       return nativePushRegistration.value;
     }
     lastToken = token;
