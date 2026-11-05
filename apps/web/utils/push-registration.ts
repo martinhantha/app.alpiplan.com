@@ -29,6 +29,23 @@ function setState(state: NativePushRegistrationState, message?: string) {
   nativePushRegistration.value = { state, message, at: Date.now() };
 }
 
+/** Native calls can hang when a system dialog never reports back; never let that block registration. */
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`${label} timeout after ${ms}ms`)), ms);
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (error) => {
+        clearTimeout(timer);
+        reject(error);
+      },
+    );
+  });
+}
+
 function errorText(error: unknown): string {
   const err = error as { data?: { message?: string }; statusMessage?: string; message?: string };
   return err?.data?.message || err?.statusMessage || err?.message || String(error);
@@ -51,15 +68,17 @@ export async function registerNativePushToken(): Promise<NativePushRegistration>
   try {
     let permissionDenied = false;
     try {
-      const permission = await queueNativePermissionRequest(() =>
-        AlpiplanDevice.requestPermissions({ alias: "notifications" }),
+      const permission = await withTimeout(
+        queueNativePermissionRequest(() => AlpiplanDevice.requestPermissions({ alias: "notifications" })),
+        10_000,
+        "notification permission",
       );
       const state = String((permission as { notifications?: string } | undefined)?.notifications ?? "");
       permissionDenied = state === "denied";
     } catch {
-      // Older plugin builds without the notifications alias: keep going, the token is independent.
+      // Older plugin builds, or a permission dialog that never reports back: the token is independent.
     }
-    const result = await AlpiplanDevice.getPushToken();
+    const result = await withTimeout(AlpiplanDevice.getPushToken(), 15_000, "push token");
     const token = result.token?.trim();
     if (!token) {
       setState("no-token");
