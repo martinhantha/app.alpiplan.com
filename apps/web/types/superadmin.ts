@@ -5,6 +5,8 @@ export interface SuperadminTenant {
   name: string;
   slug: string;
   useDefaultDuration: boolean;
+  speechRecognitionEnabled?: boolean;
+  aiParsingEnabled?: boolean;
   createdAt: string;
 }
 

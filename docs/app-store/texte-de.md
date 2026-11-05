@@ -51,7 +51,7 @@ Hinweis: Für die Nutzung ist ein Alpiplan-Konto deiner Organisation erforderlic
 Skischule,Skilehrer,Kalender,Terminplaner,Dienstplan,Kurse,Teamplanung,Einteilung,Unterricht
 
 ## Datenschutz-URL (Privacy Policy)
-https://app.alpiplan.com/datenschutz
+https://alpiplan.com/datenschutz
 
 ## Support-URL
 https://app.alpiplan.com/support

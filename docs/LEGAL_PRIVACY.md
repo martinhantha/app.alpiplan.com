@@ -66,3 +66,7 @@ Audio **nicht** dauerhaft speichern, sofern nicht ausdrücklich erforderlich und
 - [ ] Einwilligungsdialoge für optionale Features
 - [ ] Unterauftragsverzeichnis gepflegt
 - [ ] TOM-Dokumentation
+
+## Ergänzung 2026-10-30: KI-Textauswertung
+
+Wenn ein Mandant die KI-Textauswertung aktiviert, werden die Eingabetexte der Schnellerfassung (inkl. darin enthaltener Namen und Telefonnummern) sowie Lehrer-, Terminart- und Ressourcennamen an den konfigurierten KI-Anbieter (Anthropic-API oder Google Gemini API) übertragen. Kundenlisten werden nicht übertragen. **Offen:** den genutzten Anbieter (Anthropic bzw. Google) als Unterauftragsverarbeiter in den AV-Vertrag und die Datenschutzerklärung aufnehmen, bevor die Funktion für Mandanten freigeschaltet wird. API-Daten werden laut Anthropic-Nutzungsbedingungen nicht zum Training verwendet; bei Google gilt das nur für die bezahlte (nicht die kostenlose) API-Stufe.

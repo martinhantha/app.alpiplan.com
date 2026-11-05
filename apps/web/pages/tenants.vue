@@ -13,6 +13,8 @@ interface SuperadminTenant {
   name: string;
   slug: string;
   useDefaultDuration: boolean;
+  speechRecognitionEnabled?: boolean;
+  aiParsingEnabled?: boolean;
   createdAt?: string;
 }
 interface SuperadminUser {
@@ -42,7 +44,13 @@ const filters = reactive({ q: "" });
 const dialogOpen = ref(false);
 const dialogMode = ref<"create" | "edit">("create");
 const editingId = ref<string | null>(null);
-const form = reactive({ name: "", slug: "", useDefaultDuration: true });
+const form = reactive({
+  name: "",
+  slug: "",
+  useDefaultDuration: true,
+  speechRecognitionEnabled: false,
+  aiParsingEnabled: false,
+});
 
 const filtered = computed(() => {
   const q = filters.q.trim().toLowerCase();
@@ -98,6 +106,8 @@ function openCreate() {
   form.name = "";
   form.slug = "";
   form.useDefaultDuration = true;
+  form.speechRecognitionEnabled = false;
+  form.aiParsingEnabled = false;
   dialogOpen.value = true;
 }
 
@@ -107,6 +117,8 @@ function openEdit(item: SuperadminTenant) {
   form.name = item.name;
   form.slug = item.slug;
   form.useDefaultDuration = item.useDefaultDuration;
+  form.speechRecognitionEnabled = item.speechRecognitionEnabled ?? false;
+  form.aiParsingEnabled = item.aiParsingEnabled ?? false;
   dialogOpen.value = true;
 }
 
@@ -121,6 +133,8 @@ async function submit() {
       name: form.name.trim(),
       slug: form.slug.trim(),
       useDefaultDuration: form.useDefaultDuration,
+      speechRecognitionEnabled: form.speechRecognitionEnabled,
+      aiParsingEnabled: form.aiParsingEnabled,
     };
     if (dialogMode.value === "create") {
       await $fetch("/api/admin/tenants", {
@@ -264,6 +278,24 @@ onMounted(load);
                 <span class="font-medium">{{ t("tenantsPage.defaultDuration") }}</span>
                 <span class="block text-xs text-neutral-500 mt-0.5">
                   {{ t("tenantsPage.defaultDurationHint") }}
+                </span>
+              </span>
+            </label>
+            <label class="flex items-start gap-2 text-sm text-neutral-700 dark:text-neutral-300">
+              <input v-model="form.speechRecognitionEnabled" type="checkbox" class="mt-1" />
+              <span>
+                <span class="font-medium">{{ t("tenantsPage.speechRecognition") }}</span>
+                <span class="block text-xs text-neutral-500 mt-0.5">
+                  {{ t("tenantsPage.speechRecognitionHint") }}
+                </span>
+              </span>
+            </label>
+            <label class="flex items-start gap-2 text-sm text-neutral-700 dark:text-neutral-300">
+              <input v-model="form.aiParsingEnabled" type="checkbox" class="mt-1" />
+              <span>
+                <span class="font-medium">{{ t("tenantsPage.aiParsing") }}</span>
+                <span class="block text-xs text-neutral-500 mt-0.5">
+                  {{ t("tenantsPage.aiParsingHint") }}
                 </span>
               </span>
             </label>

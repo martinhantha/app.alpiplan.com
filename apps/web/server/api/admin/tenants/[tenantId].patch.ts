@@ -26,8 +26,20 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 404, statusMessage: "Mandant nicht gefunden" });
   }
 
-  const body = await readBody<{ name?: string; slug?: string; useDefaultDuration?: boolean }>(event);
-  const data: { name?: string; slug?: string; useDefaultDuration?: boolean } = {};
+  const body = await readBody<{
+    name?: string;
+    slug?: string;
+    useDefaultDuration?: boolean;
+    speechRecognitionEnabled?: boolean;
+    aiParsingEnabled?: boolean;
+  }>(event);
+  const data: {
+    name?: string;
+    slug?: string;
+    useDefaultDuration?: boolean;
+    speechRecognitionEnabled?: boolean;
+    aiParsingEnabled?: boolean;
+  } = {};
 
   if (body.name !== undefined) {
     const name = body.name.trim();
@@ -46,6 +58,12 @@ export default defineEventHandler(async (event) => {
   if (typeof body.useDefaultDuration === "boolean") {
     data.useDefaultDuration = body.useDefaultDuration;
   }
+  if (typeof body.speechRecognitionEnabled === "boolean") {
+    data.speechRecognitionEnabled = body.speechRecognitionEnabled;
+  }
+  if (typeof body.aiParsingEnabled === "boolean") {
+    data.aiParsingEnabled = body.aiParsingEnabled;
+  }
 
   if (!Object.keys(data).length) {
     throw createError({ statusCode: 400, statusMessage: "Keine Änderungen übermittelt" });
@@ -54,7 +72,15 @@ export default defineEventHandler(async (event) => {
   const tenant = await prisma.tenant.update({
     where: { id: existing.id },
     data,
-    select: { id: true, name: true, slug: true, useDefaultDuration: true, createdAt: true },
+    select: {
+      id: true,
+      name: true,
+      slug: true,
+      useDefaultDuration: true,
+      speechRecognitionEnabled: true,
+      aiParsingEnabled: true,
+      createdAt: true,
+    },
   });
 
   return {
@@ -62,6 +88,8 @@ export default defineEventHandler(async (event) => {
     name: tenant.name,
     slug: tenant.slug,
     useDefaultDuration: tenant.useDefaultDuration,
+    speechRecognitionEnabled: tenant.speechRecognitionEnabled,
+    aiParsingEnabled: tenant.aiParsingEnabled,
     createdAt: tenant.createdAt.toISOString(),
   };
 });

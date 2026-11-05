@@ -50,3 +50,16 @@ Begleitend zum Konzept (Abschnitt 8a): Umsetzungsdetails für Produkt/Frontend/B
 - Bei hoher Konfidenz **keine** unnötigen Rückfragen (Happy Path &lt; 5 s).
 - Keine automatische Buchung ohne Nutzerbestätigung (MVP).
 - Alle Assistenz-Daten für Nutzer **einsehbar und löschbar**.
+
+## 6. KI-Textauswertung (optional pro Mandant)
+
+Stand 2026-10-30. `POST /assistant/parse-intent` hat zwei Wege:
+
+1. **Regel-Parser** (`server/utils/parse-intent.ts`): immer verfügbar, auch offline/ohne Key. Seit 2026-10 mit unscharfem Namensabgleich (Levenshtein + Kölner Phonetik, `server/utils/fuzzy-name.ts`); exakte Treffer haben Vorrang.
+2. **KI-Extraktion** (`server/utils/ai-intent.ts`): aktiv, wenn `Tenant.aiParsingEnabled` gesetzt ist **und** ein Anbieter konfiguriert ist. Anbieter: Anthropic (`ANTHROPIC_API_KEY`, Standardmodell `claude-haiku-5-5`) oder Google Gemini (`GEMINI_API_KEY`, Standardmodell `gemini-flash-lite-latest`, ein von Google gepflegter Alias; `gemini-flash-latest` war beim Test am 2026-10-30 mit 34 s Antwortzeit bzw. Überlastung für die Schnellerfassung zu langsam), Auswahl über `ASSISTANT_AI_PROVIDER` oder automatisch nach vorhandenem Key. Das Modell strukturiert den Text nur; IDs löst `resolveExtractedIntent` serverseitig gegen den Katalog auf. Bei Fehler oder Timeout antwortet der Regel-Parser. Die Antwort enthält `source: "ai" | "rules"`.
+
+Datensparsamkeit: An das Modell gehen Text, Datum/Zeitzone, Lehrer-Bezeichnung, Namen der Lehrer, Terminarten und Ressourcen sowie die Mandanten-Hinweise (`Tenant.assistantHints`). **Kundenlisten und Telefonnummern aus dem Katalog werden nicht übermittelt.** Jede Anfrage wird ohne Text in `AssistantUsage` protokolliert (`model` = `anbieter/modell`, Token, Latenz, Erfolg) zur Kostenzuordnung je Mandant.
+
+Freischaltung: `Tenant.speechRecognitionEnabled` und `Tenant.aiParsingEnabled` setzt nur der Superadmin (Mandanten-Seite oder Einstellungen im jeweiligen Mandanten); Mandanten-Admins sehen die Schalter nur lesend. Sprache und Hinweise bleiben beim Mandanten-Admin.
+
+Spracherkennung: Sprache pro Mandant (`Tenant.speechLanguage`), Android 13+ erhält Katalognamen als Biasing-Strings, bei mehreren Alternativen gewinnt die mit den meisten bekannten Namen (`utils/speech-transcript.ts` → `pickTranscript`).

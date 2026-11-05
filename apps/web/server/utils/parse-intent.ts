@@ -1,3 +1,5 @@
+import { fold, fuzzyWordEquals } from "./fuzzy-name";
+
 export interface IntentEntity {
   id: string;
   displayName: string;
@@ -38,6 +40,9 @@ export interface ParsedAppointmentIntent {
   durationMinutes?: number;
   teacherId?: string;
   teacherName?: string;
+  /** All assigned staff (teacherId is the first); more than one e.g. for two pilots */
+  teacherIds?: string[];
+  teacherNames?: string[];
   resourceId?: string;
   resourceName?: string;
   lessonTypeId?: string;
@@ -45,6 +50,13 @@ export interface ParsedAppointmentIntent {
   customerId?: string;
   customerName?: string;
   createCustomer?: boolean;
+  /** Further people mentioned as passengers; the data model holds one customer, the rest goes into the note */
+  additionalCustomerNames?: string[];
+  /** draft | confirmed when the text says so */
+  status?: "draft" | "confirmed";
+  reminderDate?: string;
+  reminderTime?: string;
+  reminderText?: string;
   phone?: string;
   note?: string;
   contactText?: string;
@@ -87,7 +99,7 @@ const STOP = new Set([
   "am", "an", "auf", "bei", "bitte", "das", "dem", "den", "der", "die", "dort",
   "ein", "eine", "fuer", "hier", "im", "in", "ist", "mal", "mit", "nach", "noch",
   "ok", "okay", "plus", "so", "um", "und", "von", "zu", "zum", "uhr", "heute",
-  "morgen", "uebermorgen",
+  "morgen", "uebermorgen", "sind", "ist", "doch", "wir", "haben", "einen", "noch",
 ]);
 
 const NAME_STOP = new Set([
@@ -100,17 +112,7 @@ const NAME_STOP = new Set([
 ]);
 
 const PASSENGER_RE =
-  /\b(passa[sgjch]+(?:ier|er|e|in)?|passenger|fluggast|mitfahrer(?:in)?|kunde|kundin|schueler(?:in)?|gast|teilnehmer(?:in)?|namens)\b/i;
-
-function fold(value: string): string {
-  return value
-    .normalize("NFKC")
-    .replace(/ß/g, "ss")
-    .replace(/[äÄ]/g, "ae")
-    .replace(/[öÖ]/g, "oe")
-    .replace(/[üÜ]/g, "ue")
-    .toLowerCase();
-}
+  /\b(passa[sgjch]+(?:ier|iere|ierin|er|e|in)?|passengers?|fluggaeste|fluggast|mitfahrer(?:in)?|kunden?|kundin|schueler(?:in)?|gast|gaeste|teilnehmer(?:in)?|namens)\b/i;
 
 function pad(n: number): string {
   return String(n).padStart(2, "0");
@@ -180,12 +182,42 @@ function nameMatches(displayName: string, query: string): boolean {
   return n === q || wordsOf(displayName).includes(q) || n.startsWith(`${q} `) || n.endsWith(` ${q}`);
 }
 
+/** Fuzzy tier: every query word must match some name word, allowing typos and mishearing. */
+function nameMatchesFuzzy(displayName: string, query: string): boolean {
+  const nameWords = wordsOf(displayName);
+  const queryWords = wordsOf(query);
+  if (!queryWords.length || !nameWords.length) return false;
+  return queryWords.every((q) => nameWords.some((n) => fuzzyWordEquals(n, q)));
+}
+
+/**
+ * Exact matches win. Only when there is none, fuzzy matches are returned and
+ * flagged so callers can ask instead of assigning silently.
+ */
+function matchByName<T>(items: T[], query: string, nameOf: (item: T) => string): { items: T[]; fuzzy: boolean } {
+  const exact = items.filter((item) => nameMatches(nameOf(item), query));
+  if (exact.length) return { items: exact, fuzzy: false };
+  return { items: items.filter((item) => nameMatchesFuzzy(nameOf(item), query)), fuzzy: true };
+}
+
+function customerByPhone(catalog: IntentCatalog, phone: string): IntentCustomer | undefined {
+  const hits = catalog.customers.filter((customer) =>
+    (customer.phones ?? []).some((entry) => phonesMatch(phone, entry.e164 || entry.raw || "")),
+  );
+  return hits.length === 1 ? hits[0] : undefined;
+}
+
 function uniqueIds<T extends { id: string }>(items: T[]): T[] {
   const seen = new Set<string>();
   return items.filter((item) => (seen.has(item.id) ? false : (seen.add(item.id), true)));
 }
 
-function findInText<T extends { id: string }>(items: T[], text: string, nameOf: (item: T) => string): T[] {
+function findInText<T extends { id: string }>(
+  items: T[],
+  text: string,
+  nameOf: (item: T) => string,
+  options: { fuzzy?: boolean } = {},
+): T[] {
   const folded = fold(text);
   const hits: T[] = [];
   for (const item of items) {
@@ -197,6 +229,15 @@ function findInText<T extends { id: string }>(items: T[], text: string, nameOf: 
         hits.push(item);
         break;
       }
+    }
+  }
+  // Fuzzy fallback only for non-person catalogs (lesson types, resources): "Tandemflg" -> "Tandemflug".
+  if (!hits.length && options.fuzzy) {
+    const tokens = folded.split(/[^a-z0-9]+/).filter((t) => t.length >= 4 && !STOP.has(t) && !NAME_STOP.has(t));
+    for (const item of items) {
+      const first = wordsOf(nameOf(item))[0];
+      if (!first || first.length < 4) continue;
+      if (tokens.some((token) => fuzzyWordEquals(token, first))) hits.push(item);
     }
   }
   return uniqueIds(hits);
@@ -276,23 +317,8 @@ function takeDate(text: string, now: Date, timeZone: string): { date?: string; r
     take(num.index, num.index + num[0].length, { year, month, day });
   }
 
-  const rel = [
-    { re: /\bheute\b/i, days: 0 },
-    { re: /\buebermorgen\b|\bübermorgen\b/i, days: 2 },
-    { re: /\bmorgen\b/i, days: 1 },
-  ];
-  for (const item of rel) {
-    const m = item.re.exec(rest);
-    if (m && !date) take(m.index, m.index + m[0].length, addDays(today, item.days));
-  }
-
-  const wd = new RegExp(`\\b(${Object.keys(WEEKDAYS).join("|")})\\b`, "i").exec(fold(rest));
-  if (wd && !date) {
-    const target = WEEKDAYS[fold(wd[1])];
-    take(wd.index, wd.index + wd[0].length, addDays(today, (target - today.weekday + 7) % 7));
-  }
-
-  const named = new RegExp(`\\b(\\d{1,2})\\.\\s*(${Object.keys(MONTHS).join("|")})(?:\\s*(\\d{4}))?\\b`, "i").exec(fold(rest));
+  // An explicit "16. November" wins over "morgen" even when it comes later ("... Termin ist doch am 16 November").
+  const named = new RegExp(`\\b(\\d{1,2})\\.?\\s*(${Object.keys(MONTHS).join("|")})(?:\\s*(\\d{4}))?\\b`, "i").exec(fold(rest));
   if (named && !date) {
     const day = Number(named[1]);
     const month = MONTHS[fold(named[2])];
@@ -301,7 +327,65 @@ function takeDate(text: string, now: Date, timeZone: string): { date?: string; r
     if (month) take(named.index, named.index + named[0].length, { year, month, day });
   }
 
+  const rel = [
+    { re: /\bheute\b/i, days: 0 },
+    { re: /\buebermorgen\b|\bübermorgen\b/i, days: 2 },
+    { re: /\bmorgen\b/i, days: 1 },
+  ];
+  for (const item of rel) {
+    const m = item.re.exec(rest);
+    if (!m) continue;
+    if (!date) take(m.index, m.index + m[0].length, addDays(today, item.days));
+    else rest = consume(rest, m.index, m.index + m[0].length);
+  }
+
+  const wd = new RegExp(`\\b(${Object.keys(WEEKDAYS).join("|")})\\b`, "i").exec(fold(rest));
+  if (wd && !date) {
+    const target = WEEKDAYS[fold(wd[1])];
+    take(wd.index, wd.index + wd[0].length, addDays(today, (target - today.weekday + 7) % 7));
+  }
+
   return { date, rest };
+}
+
+function takeStatus(text: string): { status?: "draft" | "confirmed"; rest: string } {
+  const draft = /\b(?:entwurf|vorlaeufig|vorläufig|unverbindlich|bozza|provvisorio)\b/i.exec(text);
+  if (draft) return { status: "draft", rest: consume(text, draft.index, draft.index + draft[0].length) };
+  const confirmed = /\b(?:bestaetigt|bestätigt|fix|confermato)\b/i.exec(text);
+  if (confirmed) return { status: "confirmed", rest: consume(text, confirmed.index, confirmed.index + confirmed[0].length) };
+  return { rest: text };
+}
+
+const REMINDER_WORDS: Record<string, number> = { einen: 1, ein: 1, eine: 1, zwei: 2, drei: 3, vier: 4, fuenf: 5, sieben: 7 };
+
+/** "Erinnerung 2 Tage vorher, Wetterlage checken" -> reminder date relative to the appointment date plus text. */
+function takeReminder(text: string, appointmentDate?: string): { date?: string; text?: string; rest: string } {
+  const m = /\b(?:erinnerung|erinnere\s+mich|reminder|promemoria)\b\s*[:,]?\s*(?:(\d{1,2}|einen|ein|eine|zwei|drei|vier|fuenf|fünf|sieben)\s+(tage?|wochen?)\s+(?:vorher|davor|zuvor|vor\s+dem\s+termin)|am\s+vortag|einen\s+tag\s+vorher)?\s*[:,]?\s*([^,.;]*)/i.exec(text);
+  if (!m) return { rest: text };
+  const rest = consume(text, m.index, m.index + m[0].length);
+  let days: number | undefined;
+  if (m[1] && m[2]) {
+    const amount = /^\d+$/.test(m[1]) ? Number(m[1]) : REMINDER_WORDS[fold(m[1])] ?? 1;
+    days = /woche/i.test(m[2]) ? amount * 7 : amount;
+  } else if (/vortag|einen\s+tag\s+vorher/i.test(m[0])) {
+    days = 1;
+  }
+  const reminderText = (m[3] ?? "").trim().replace(/\s+/g, " ") || undefined;
+  if (days === undefined || !appointmentDate) return { text: reminderText, rest };
+  const [y, mo, d] = appointmentDate.split("-").map(Number);
+  if (!y || !mo || !d) return { text: reminderText, rest };
+  const next = addDays({ year: y, month: mo, day: d }, -days);
+  return { date: dateKey(next.year, next.month, next.day), text: reminderText, rest };
+}
+
+function validDate(value: string | null | undefined): string | undefined {
+  return value && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : undefined;
+}
+
+function validTime(value: string | null | undefined): string | undefined {
+  if (!value || !/^\d{1,2}:\d{1,2}$/.test(value)) return undefined;
+  const [h, m] = value.split(":").map(Number);
+  return h !== undefined && m !== undefined && h <= 23 && m <= 59 ? `${pad(h)}:${pad(m)}` : undefined;
 }
 
 function titleName(parts: string[]): string {
@@ -404,34 +488,30 @@ function resolveCustomer(
   }
 
   if (parsed.phone && !parsed.customerId && !parsed.customerName) {
-    const byPhone = catalog.customers.filter((customer) =>
-      (customer.phones ?? []).some((phone) => phonesMatch(parsed.phone!, phone.e164 || phone.raw || "")),
-    );
-    if (byPhone.length === 1) {
-      parsed.customerId = byPhone[0].id;
-      parsed.customerName = byPhone[0].displayName;
+    const byPhone = customerByPhone(catalog, parsed.phone);
+    if (byPhone) {
+      parsed.customerId = byPhone.id;
+      parsed.customerName = byPhone.displayName;
       parsed.createCustomer = false;
       fieldConfidence.customerId = 0.9;
     }
   }
 
   if (parsed.customerName) {
-    const hits = catalog.customers.filter((customer) => nameMatches(customer.displayName, parsed.customerName!));
-    if (hits.length === 1) {
+    const { items: hits, fuzzy } = matchByName(catalog.customers, parsed.customerName, (customer) => customer.displayName);
+    if (hits.length === 1 && !fuzzy) {
       parsed.customerId = hits[0].id;
       parsed.customerName = hits[0].displayName;
       parsed.createCustomer = false;
       fieldConfidence.customerId = 0.9;
       rest = stripName(rest, hits[0].displayName);
-    } else if (hits.length > 1) {
-      questions.push({
-        id: "customer",
-        prompt: `Welcher Passagier „${parsed.customerName}“ ist gemeint?`,
-        options: [
-          ...hits.slice(0, 4).map((item) => ({ value: item.id, label: item.displayName })),
-          { value: "new", label: `Neu anlegen: ${parsed.customerName}` },
-        ],
-      });
+    } else if (hits.length >= 1) {
+      // Similar names (typo, mishearing) are never assigned silently: ask, default to a new customer.
+      if (fuzzy) {
+        parsed.createCustomer = true;
+        fieldConfidence.customerId = 0.6;
+      }
+      questions.push(customerQuestion(parsed.customerName, hits, fuzzy));
     } else {
       parsed.createCustomer = true;
       parsed.customerId = undefined;
@@ -445,6 +525,269 @@ function resolveCustomer(
 function dropQuestion(questions: ClarifyingQuestion[], id: string) {
   const index = questions.findIndex((q) => q.id === id);
   if (index >= 0) questions.splice(index, 1);
+}
+
+/**
+ * Staff mentioned in free text without ambiguity: full name present, or a first
+ * name that only one staff member has. Shared first names ("Martin") are skipped.
+ */
+function unambiguousTeachers(teachers: IntentEntity[], text: string): IntentEntity[] {
+  const folded = fold(text);
+  const present = (candidate: string) =>
+    new RegExp(`(?:^|[^a-z0-9])${escapeRe(candidate)}(?=[^a-z0-9]|$)`).test(folded);
+  const hits = findInText(teachers, text, (item) => item.displayName);
+  const firstWordCount = new Map<string, number>();
+  for (const item of hits) {
+    const first = wordsOf(item.displayName)[0] ?? "";
+    firstWordCount.set(first, (firstWordCount.get(first) ?? 0) + 1);
+  }
+  return hits.filter((item) => {
+    if (present(fold(item.displayName))) return true;
+    const first = wordsOf(item.displayName)[0] ?? "";
+    return first.length >= 2 && firstWordCount.get(first) === 1;
+  });
+}
+
+/** Append a staff member; the first one also fills the legacy single teacherId/teacherName. */
+function addTeacher(
+  parsed: ParsedAppointmentIntent,
+  teacher: IntentEntity,
+  fieldConfidence: Record<string, number>,
+  confidence: number,
+) {
+  const ids = parsed.teacherIds ?? (parsed.teacherId ? [parsed.teacherId] : []);
+  const names = parsed.teacherNames ?? (parsed.teacherName ? [parsed.teacherName] : []);
+  if (!ids.includes(teacher.id)) {
+    ids.push(teacher.id);
+    names.push(teacher.displayName);
+  }
+  parsed.teacherIds = ids;
+  parsed.teacherNames = names;
+  if (!parsed.teacherId) {
+    parsed.teacherId = teacher.id;
+    parsed.teacherName = teacher.displayName;
+  }
+  fieldConfidence.teacherId = Math.max(fieldConfidence.teacherId ?? 0, confidence);
+}
+
+function customerQuestion(name: string, hits: IntentCustomer[], fuzzy: boolean): ClarifyingQuestion {
+  return {
+    id: "customer",
+    prompt: fuzzy ? `Ist „${name}“ ein bestehender Passagier?` : `Welcher Passagier „${name}“ ist gemeint?`,
+    options: [
+      ...hits.slice(0, 4).map((item) => ({ value: item.id, label: item.displayName })),
+      { value: "new", label: `Neu anlegen: ${name}` },
+    ],
+  };
+}
+
+/** Apply answers to earlier clarifying questions; shared by the rule parser and the AI path. */
+function applyAnswers(
+  parsed: ParsedAppointmentIntent,
+  catalog: IntentCatalog,
+  questions: ClarifyingQuestion[],
+  fieldConfidence: Record<string, number>,
+  answers: Record<string, string>,
+) {
+  const teacherAnswer = answers.teacher || answers.teacherId;
+  if (teacherAnswer) {
+    const teacher = catalog.teachers.find((t) => t.id === teacherAnswer);
+    if (teacher) {
+      addTeacher(parsed, teacher, fieldConfidence, 1);
+      dropQuestion(questions, "teacher");
+    }
+  }
+  const lessonAnswer = answers.lessonType || answers.lessonTypeId;
+  if (lessonAnswer) {
+    const lesson = catalog.lessonTypes.find((t) => t.id === lessonAnswer);
+    if (lesson) {
+      parsed.lessonTypeId = lesson.id;
+      parsed.lessonTypeName = lesson.displayName;
+      fieldConfidence.lessonTypeId = 1;
+      dropQuestion(questions, "lessonType");
+    }
+  }
+  const customerAnswer = answers.customer || answers.customerId;
+  if (customerAnswer === "new") {
+    parsed.customerId = undefined;
+    parsed.createCustomer = true;
+    fieldConfidence.customerId = 1;
+    dropQuestion(questions, "customer");
+  } else if (customerAnswer) {
+    const customer = catalog.customers.find((c) => c.id === customerAnswer);
+    if (customer) {
+      parsed.customerId = customer.id;
+      parsed.customerName = customer.displayName;
+      parsed.createCustomer = false;
+      fieldConfidence.customerId = 1;
+      dropQuestion(questions, "customer");
+    }
+  }
+}
+
+/** Field values as produced by the AI model (names as text, no IDs). */
+export interface ExtractedIntent {
+  contactText: string;
+  date?: string | null;
+  time?: string | null;
+  durationMinutes?: number | null;
+  teacherName?: string | null;
+  teacherNames?: string[] | null;
+  lessonTypeName?: string | null;
+  resourceName?: string | null;
+  customerName?: string | null;
+  customerNames?: string[] | null;
+  status?: string | null;
+  reminderDate?: string | null;
+  reminderTime?: string | null;
+  reminderText?: string | null;
+  phone?: string | null;
+  note?: string | null;
+}
+
+/**
+ * Turn an AI extraction into the same result shape as the rule parser: validate
+ * values and resolve names against the tenant catalog (exact first, fuzzy with a question).
+ */
+export function resolveExtractedIntent(
+  extraction: ExtractedIntent,
+  catalog: IntentCatalog,
+  answers: Record<string, string> = {},
+): ParseIntentResult {
+  const parsed: ParsedAppointmentIntent = { contactText: extraction.contactText.replace(/\s+/g, " ").trim() };
+  const fieldConfidence: Record<string, number> = {};
+  const questions: ClarifyingQuestion[] = [];
+
+  const date = validDate(extraction.date);
+  if (date) {
+    parsed.date = date;
+    fieldConfidence.date = 0.9;
+  }
+  const time = validTime(extraction.time);
+  if (time) {
+    parsed.time = time;
+    fieldConfidence.time = 0.9;
+  }
+  if (extraction.status === "draft" || extraction.status === "confirmed") {
+    parsed.status = extraction.status;
+  }
+  const reminderDate = validDate(extraction.reminderDate);
+  const reminderText = extraction.reminderText?.trim();
+  if (reminderDate || reminderText) {
+    parsed.reminderDate = reminderDate;
+    parsed.reminderTime = validTime(extraction.reminderTime);
+    parsed.reminderText = reminderText || undefined;
+    // A reminder only exists for drafts in this app.
+    if (!parsed.status) parsed.status = "draft";
+    fieldConfidence.reminderDate = reminderDate ? 0.85 : 0;
+  }
+  const duration = extraction.durationMinutes;
+  if (typeof duration === "number" && Number.isFinite(duration) && duration > 0 && duration <= 24 * 60) {
+    parsed.durationMinutes = Math.round(duration);
+    fieldConfidence.durationMinutes = 0.85;
+  }
+  if (extraction.phone?.trim()) {
+    const phone = normalizePhone(extraction.phone);
+    if (digits(phone).length >= 6) {
+      parsed.phone = phone;
+      fieldConfidence.phone = 0.85;
+    }
+  }
+
+  const teacherQueries = [...(extraction.teacherNames ?? []), extraction.teacherName ?? ""]
+    .map((name) => name.trim())
+    .filter((name, index, all) => name && all.indexOf(name) === index);
+  for (const teacherQuery of teacherQueries) {
+    const { items, fuzzy } = matchByName(catalog.teachers, teacherQuery, (item) => item.displayName);
+    const single = items.length === 1 ? items[0] : undefined;
+    if (single) {
+      addTeacher(parsed, single, fieldConfidence, fuzzy ? 0.75 : 0.9);
+    } else if (items.length > 1 && !questions.some((q) => q.id === "teacher")) {
+      questions.push({
+        id: "teacher",
+        prompt: `Welcher „${catalog.teacherLabel}“ ist mit „${teacherQuery}“ gemeint?`,
+        options: items.slice(0, 5).map((item) => ({ value: item.id, label: item.displayName })),
+      });
+    }
+  }
+
+  const lessonQuery = extraction.lessonTypeName?.trim();
+  if (lessonQuery) {
+    const { items, fuzzy } = matchByName(catalog.lessonTypes, lessonQuery, (item) => item.displayName);
+    const single = items.length === 1 ? items[0] : undefined;
+    if (single) {
+      parsed.lessonTypeId = single.id;
+      parsed.lessonTypeName = single.displayName;
+      fieldConfidence.lessonTypeId = fuzzy ? 0.75 : 0.9;
+    } else if (items.length > 1) {
+      questions.push({
+        id: "lessonType",
+        prompt: "Welche Terminart ist gemeint?",
+        options: items.slice(0, 5).map((item) => ({ value: item.id, label: item.displayName })),
+      });
+    }
+  }
+
+  const resourceQuery = extraction.resourceName?.trim();
+  if (resourceQuery) {
+    const { items, fuzzy } = matchByName(catalog.resources, resourceQuery, (item) => item.name);
+    const single = items.length === 1 ? items[0] : undefined;
+    if (single) {
+      parsed.resourceId = single.id;
+      parsed.resourceName = single.name;
+      fieldConfidence.resourceId = fuzzy ? 0.7 : 0.85;
+    }
+  }
+
+  const customerList = [...(extraction.customerNames ?? []), extraction.customerName ?? ""]
+    .map((name) => name.trim())
+    .filter((name, index, all) => name && all.indexOf(name) === index);
+  const customerQuery = customerList[0];
+  if (customerList.length > 1) parsed.additionalCustomerNames = customerList.slice(1);
+  if (customerQuery) {
+    const { items, fuzzy } = matchByName(catalog.customers, customerQuery, (item) => item.displayName);
+    const single = items.length === 1 ? items[0] : undefined;
+    if (single && !fuzzy) {
+      parsed.customerId = single.id;
+      parsed.customerName = single.displayName;
+      parsed.createCustomer = false;
+      fieldConfidence.customerId = 0.9;
+    } else if (items.length >= 1) {
+      parsed.customerName = customerQuery;
+      parsed.createCustomer = true;
+      fieldConfidence.customerId = 0.6;
+      questions.push(customerQuestion(customerQuery, items, fuzzy));
+    } else {
+      parsed.customerName = customerQuery;
+      parsed.createCustomer = true;
+      fieldConfidence.customerId = 0.8;
+      fieldConfidence.customerName = 0.85;
+    }
+  } else if (parsed.phone) {
+    const byPhone = customerByPhone(catalog, parsed.phone);
+    if (byPhone) {
+      parsed.customerId = byPhone.id;
+      parsed.customerName = byPhone.displayName;
+      parsed.createCustomer = false;
+      fieldConfidence.customerId = 0.9;
+    }
+  }
+
+  const noteParts = [extraction.note?.trim() ?? ""];
+  if (parsed.additionalCustomerNames?.length) {
+    noteParts.push(`Weitere Passagiere: ${parsed.additionalCustomerNames.join(", ")}`);
+  }
+  const note = noteParts.filter(Boolean).join(" · ");
+  if (note) parsed.note = note;
+
+  applyAnswers(parsed, catalog, questions, fieldConfidence, answers);
+
+  return {
+    parsed,
+    fieldConfidence,
+    clarifyingQuestions: questions.slice(0, 3),
+    suggestedDefaults: {},
+  };
 }
 
 export function parseAppointmentIntent(
@@ -487,6 +830,19 @@ export function parseAppointmentIntent(
     fieldConfidence.durationMinutes = 0.9;
   }
 
+  const status = takeStatus(rest);
+  rest = status.rest;
+  if (status.status) parsed.status = status.status;
+
+  const reminder = takeReminder(rest, parsed.date);
+  rest = reminder.rest;
+  if (reminder.date || reminder.text) {
+    parsed.reminderDate = reminder.date;
+    parsed.reminderText = reminder.text;
+    if (!parsed.status) parsed.status = "draft";
+    fieldConfidence.reminderDate = reminder.date ? 0.85 : 0;
+  }
+
   const passenger = takeLabeledName(rest, PASSENGER_RE);
   rest = passenger.rest;
   if (passenger.name) {
@@ -500,7 +856,7 @@ export function parseAppointmentIntent(
   const teacherLabel = takeLabeledName(rest, new RegExp(`\\b(?:${roles.map(escapeRe).join("|")})\\b`, "i"));
   rest = teacherLabel.rest;
 
-  const lessonHits = findInText(catalog.lessonTypes, rest, (item) => item.displayName);
+  const lessonHits = findInText(catalog.lessonTypes, rest, (item) => item.displayName, { fuzzy: true });
   if (lessonHits.length === 1) {
     parsed.lessonTypeId = lessonHits[0].id;
     parsed.lessonTypeName = lessonHits[0].displayName;
@@ -518,6 +874,7 @@ export function parseAppointmentIntent(
     catalog.resources.map((item) => ({ id: item.id, displayName: item.name })),
     rest,
     (item) => item.displayName,
+    { fuzzy: true },
   );
   if (resourceHits.length === 1) {
     parsed.resourceId = resourceHits[0].id;
@@ -526,15 +883,32 @@ export function parseAppointmentIntent(
     rest = stripName(rest, resourceHits[0].displayName);
   }
 
-  const teacherHits = teacherLabel.name
-    ? catalog.teachers.filter((item) => nameMatches(item.displayName, teacherLabel.name!))
+  const labeledTeacher = teacherLabel.name
+    ? matchByName(catalog.teachers, teacherLabel.name, (item) => item.displayName)
+    : null;
+  const teacherHits = labeledTeacher
+    ? labeledTeacher.items
     : findInText(catalog.teachers, rest, (item) => item.displayName);
-  if (teacherHits.length === 1) {
-    parsed.teacherId = teacherHits[0].id;
-    parsed.teacherName = teacherHits[0].displayName;
-    fieldConfidence.teacherId = teacherLabel.name ? 0.92 : 0.82;
-    rest = stripName(rest, teacherHits[0].displayName);
+  const onlyTeacher = teacherHits.length === 1 ? teacherHits[0] : undefined;
+  if (onlyTeacher) {
+    addTeacher(parsed, onlyTeacher, fieldConfidence, labeledTeacher ? (labeledTeacher.fuzzy ? 0.75 : 0.92) : 0.82);
+    rest = stripName(rest, onlyTeacher.displayName);
+    // "Pilot Sepp und Martin Huber": further staff named alongside the labeled one join the appointment.
+    if (labeledTeacher) {
+      for (const extra of unambiguousTeachers(catalog.teachers, rest)) {
+        if (extra.id === parsed.teacherId) continue;
+        addTeacher(parsed, extra, fieldConfidence, 0.8);
+        rest = stripName(rest, extra.displayName);
+      }
+    }
   } else if (teacherHits.length > 1) {
+    // "Pilot Martin und Martin Gasser": assign the fully named one, ask about the bare first name.
+    if (labeledTeacher) {
+      for (const extra of unambiguousTeachers(catalog.teachers, rest)) {
+        addTeacher(parsed, extra, fieldConfidence, 0.8);
+        rest = stripName(rest, extra.displayName);
+      }
+    }
     questions.push({
       id: "teacher",
       prompt: `Welcher „${teacherLabel.name || catalog.teacherLabel}“ ist gemeint?`,
@@ -544,49 +918,22 @@ export function parseAppointmentIntent(
 
   rest = resolveCustomer(parsed, catalog, rest, questions, fieldConfidence);
 
-  const teacherAnswer = answers.teacher || answers.teacherId;
-  if (teacherAnswer) {
-    const teacher = catalog.teachers.find((t) => t.id === teacherAnswer);
-    if (teacher) {
-      parsed.teacherId = teacher.id;
-      parsed.teacherName = teacher.displayName;
-      fieldConfidence.teacherId = 1;
-      dropQuestion(questions, "teacher");
-    }
-  }
-  const lessonAnswer = answers.lessonType || answers.lessonTypeId;
-  if (lessonAnswer) {
-    const lesson = catalog.lessonTypes.find((t) => t.id === lessonAnswer);
-    if (lesson) {
-      parsed.lessonTypeId = lesson.id;
-      parsed.lessonTypeName = lesson.displayName;
-      fieldConfidence.lessonTypeId = 1;
-      dropQuestion(questions, "lessonType");
-    }
-  }
-  const customerAnswer = answers.customer || answers.customerId;
-  if (customerAnswer === "new") {
-    parsed.customerId = undefined;
-    parsed.createCustomer = true;
-    fieldConfidence.customerId = 1;
-    dropQuestion(questions, "customer");
-  } else if (customerAnswer) {
-    const customer = catalog.customers.find((c) => c.id === customerAnswer);
-    if (customer) {
-      parsed.customerId = customer.id;
-      parsed.customerName = customer.displayName;
-      parsed.createCustomer = false;
-      fieldConfidence.customerId = 1;
-      dropQuestion(questions, "customer");
-    }
-  }
+  applyAnswers(parsed, catalog, questions, fieldConfidence, answers);
 
-  const leftover = rest.replace(/\s+/g, " ").trim();
-  const leftoverTokens = leftover
-    .split(" ")
-    .map((t) => fold(t.replace(/[^\p{L}\p{N}-]+/gu, "")))
-    .filter((t) => t && !STOP.has(t) && !NAME_STOP.has(t) && t.length > 1);
-  if (leftoverTokens.length) parsed.note = leftover;
+  // Keep only segments with real content; drop filler left behind by consumed fields ("Termin ist doch am ,").
+  const isFiller = (t: string) => !t || STOP.has(t) || NAME_STOP.has(t) || t.length <= 1;
+  const segments = rest
+    .split(/[,.;]+/)
+    .map((segment) => segment.replace(/\s+/g, " ").trim())
+    .map((segment) => {
+      const words = segment.split(" ");
+      while (words.length && isFiller(fold(words[0]!.replace(/[^\p{L}\p{N}-]+/gu, "")))) words.shift();
+      return words.join(" ");
+    })
+    .filter((segment) =>
+      segment.split(" ").some((t) => !isFiller(fold(t.replace(/[^\p{L}\p{N}-]+/gu, "")))),
+    );
+  if (segments.length) parsed.note = segments.join(", ");
 
   return {
     parsed,

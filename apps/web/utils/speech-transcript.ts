@@ -80,3 +80,33 @@ export function spokenFromRecognition(finals: string[], lastInterim: string): st
   const committed = finals.reduce((text, part) => commitUtterance(text, part), "");
   return withLiveInterim(committed, lastInterim);
 }
+
+function speechWords(value: string): string[] {
+  return value
+    .toLowerCase()
+    .split(/[^\p{L}\p{N}]+/u)
+    .filter((word) => word.length >= 3);
+}
+
+/**
+ * Choose between recognizer alternatives: the one mentioning the most known names
+ * (staff, customers, appointment types) wins; ties keep the recognizer's first choice.
+ */
+export function pickTranscript(primary: string, alternatives?: string[], hints?: string[]): string {
+  const candidates = [primary, ...(alternatives ?? [])].map(normalizeSpeech).filter(Boolean);
+  const first = candidates[0] ?? "";
+  if (!first) return "";
+  if (candidates.length === 1 || !hints?.length) return first;
+  const hintWords = new Set(hints.flatMap(speechWords));
+  if (!hintWords.size) return first;
+  let best = first;
+  let bestScore = -1;
+  for (const candidate of candidates) {
+    const score = speechWords(candidate).filter((word) => hintWords.has(word)).length;
+    if (score > bestScore) {
+      best = candidate;
+      bestScore = score;
+    }
+  }
+  return best;
+}

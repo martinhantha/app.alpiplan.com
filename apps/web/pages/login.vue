@@ -32,6 +32,8 @@ async function onSubmit() {
     pending.value = false;
   }
 }
+
+const privacyUrl = usePrivacyUrl();
 </script>
 
 <template>
@@ -106,9 +108,9 @@ async function onSubmit() {
               Support
             </NuxtLink>
             <span aria-hidden="true">·</span>
-            <NuxtLink to="/datenschutz" class="underline underline-offset-2 hover:text-neutral-700 dark:hover:text-neutral-200">
-              Datenschutz
-            </NuxtLink>
+            <a :href="privacyUrl" target="_blank" rel="noopener" class="underline underline-offset-2 hover:text-neutral-700 dark:hover:text-neutral-200">
+              {{ t("supportPage.footerPrivacy") }}
+            </a>
           </p>
         </template>
       </UCard>

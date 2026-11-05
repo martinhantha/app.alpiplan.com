@@ -76,6 +76,12 @@ model Tenant {
   resourcesEnabled Boolean @default(true)
   /// when true, Schnellerfassung may auto-start speech recognition; default off per tenant
   speechRecognitionEnabled Boolean @default(false)
+  /// BCP-47 tag for speech recognition in Schnellerfassung, e.g. de-DE, de-AT, it-IT
+  speechLanguage String @default("de-DE")
+  /// when true, parse-intent uses the AI model (needs ANTHROPIC_API_KEY); falls back to the rule parser
+  aiParsingEnabled Boolean @default(false)
+  /// tenant-specific vocabulary for the assistant, e.g. aliases and nicknames; shown to the AI model only
+  assistantHints String?
   /// when true, draft/confirmed appointments become completed after endsAt + autoCompleteAfterMinutes
   autoCompleteAppointments Boolean @default(false)
   autoCompleteAfterMinutes Int @default(0)
@@ -104,6 +110,7 @@ model Tenant {
   deviceContactLinks   DeviceContactLink[]
   customerMergeHistory CustomerMergeHistory[]
   briefingPushes       NextDayBriefingPush[]
+  assistantUsages      AssistantUsage[]
 
   @@index([defaultTeacherId])
   @@index([defaultLessonTypeId])
@@ -620,6 +627,25 @@ model AuditLog {
   entityId   String?
   payload    Json?
   createdAt  DateTime @default(now())
+
+  @@index([tenantId, createdAt])
+}
+
+/// Per-request log of AI parse-intent calls; no text or PII, only token counts for cost allocation per tenant.
+model AssistantUsage {
+  id              String   @id @default(uuid()) @db.Uuid
+  tenantId        String   @db.Uuid
+  userId          String?  @db.Uuid
+  model           String
+  inputTokens     Int      @default(0)
+  outputTokens    Int      @default(0)
+  cacheReadTokens Int      @default(0)
+  latencyMs       Int      @default(0)
+  /// false = model call failed and the rule parser answered instead
+  ok              Boolean  @default(true)
+  createdAt       DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@index([tenantId, createdAt])
 }

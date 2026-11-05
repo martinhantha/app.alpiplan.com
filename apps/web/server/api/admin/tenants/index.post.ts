@@ -12,7 +12,13 @@ function normalizeSlug(input: string): string {
 
 export default defineEventHandler(async (event) => {
   await requireSuperadmin(event);
-  const body = await readBody<{ name?: string; slug?: string; useDefaultDuration?: boolean }>(event);
+  const body = await readBody<{
+    name?: string;
+    slug?: string;
+    useDefaultDuration?: boolean;
+    speechRecognitionEnabled?: boolean;
+    aiParsingEnabled?: boolean;
+  }>(event);
 
   const name = body.name?.trim();
   const slug = normalizeSlug(body.slug ?? "");
@@ -29,8 +35,18 @@ export default defineEventHandler(async (event) => {
       name,
       slug,
       useDefaultDuration: typeof body.useDefaultDuration === "boolean" ? body.useDefaultDuration : true,
+      speechRecognitionEnabled: body.speechRecognitionEnabled === true,
+      aiParsingEnabled: body.aiParsingEnabled === true,
     },
-    select: { id: true, name: true, slug: true, useDefaultDuration: true, createdAt: true },
+    select: {
+      id: true,
+      name: true,
+      slug: true,
+      useDefaultDuration: true,
+      speechRecognitionEnabled: true,
+      aiParsingEnabled: true,
+      createdAt: true,
+    },
   });
 
   return {
@@ -38,6 +54,8 @@ export default defineEventHandler(async (event) => {
     name: tenant.name,
     slug: tenant.slug,
     useDefaultDuration: tenant.useDefaultDuration,
+    speechRecognitionEnabled: tenant.speechRecognitionEnabled,
+    aiParsingEnabled: tenant.aiParsingEnabled,
     createdAt: tenant.createdAt.toISOString(),
   };
 });

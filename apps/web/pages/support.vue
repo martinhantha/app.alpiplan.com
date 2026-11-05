@@ -9,6 +9,7 @@ const { t } = useI18n();
 
 const providerName = config.legalName || "Alpiplan";
 const supportEmail = config.supportEmail || "support@alpiplan.com";
+const privacyUrl = usePrivacyUrl();
 
 useSeoMeta({
   title: () => t("supportPage.seoTitle"),
@@ -74,7 +75,7 @@ useSeoMeta({
           <h2>{{ t("supportPage.privacy") }}</h2>
           <p>
             {{ t("supportPage.privacyLead") }}
-            <NuxtLink to="/datenschutz">{{ t("supportPage.privacyLink") }}</NuxtLink>.
+            <a :href="privacyUrl" target="_blank" rel="noopener">{{ t("supportPage.privacyLink") }}</a>.
             {{ t("supportPage.privacyRest") }}
           </p>
         </section>
@@ -83,7 +84,7 @@ useSeoMeta({
       <footer
         class="border-t border-neutral-200 pt-6 text-xs text-neutral-500 dark:border-neutral-800 dark:text-neutral-400 flex flex-wrap gap-x-4 gap-y-1"
       >
-        <NuxtLink to="/datenschutz" class="underline underline-offset-2">{{ t("supportPage.footerPrivacy") }}</NuxtLink>
+        <a :href="privacyUrl" target="_blank" rel="noopener" class="underline underline-offset-2">{{ t("supportPage.footerPrivacy") }}</a>
         <NuxtLink to="/login" class="underline underline-offset-2">{{ t("supportPage.footerLogin") }}</NuxtLink>
       </footer>
     </div>

@@ -23,6 +23,9 @@ export interface AuthMembership {
   teacherLabel: string;
   resourcesEnabled: boolean;
   speechRecognitionEnabled: boolean;
+  speechLanguage: string;
+  aiParsingEnabled: boolean;
+  assistantHints: string | null;
   autoCompleteAppointments: boolean;
   autoCompleteAfterMinutes: number;
   teacherProfileId: string | null;

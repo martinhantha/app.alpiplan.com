@@ -12,15 +12,12 @@ import {
   resolveAppointmentPhone,
   resolveContactOrganization,
 } from "../utils/appointment-contact";
-import { commitUtterance, withLiveInterim } from "../utils/speech-transcript";
+import { commitUtterance, pickTranscript, withLiveInterim } from "../utils/speech-transcript";
 import { isNativeAndroidSpeech, startNativeSpeech } from "../utils/native-speech";
 import { appointmentStatusColor, type AppointmentStatus } from "../utils/appointment-status";
 import { CALL_STATE_EVENT } from "../utils/call-state";
 
-type WebSpeechRecognitionEventResult = {
-  isFinal: boolean;
-  0: { transcript: string };
-};
+type WebSpeechRecognitionEventResult = ArrayLike<{ transcript: string }> & { isFinal: boolean };
 type WebSpeechRecognitionEvent = {
   resultIndex: number;
   results: ArrayLike<WebSpeechRecognitionEventResult>;
@@ -166,6 +163,18 @@ const speechRecognitionEnabled = computed(
 const isEditing = computed(() => Boolean(props.appointment?.id));
 const text = ref(props.appointment?.appointmentContactText ?? props.initialContactText ?? "");
 const options = ref<SchedulingOptions | null>(null);
+const speechLanguage = computed(() => primaryTenant.value?.speechLanguage || "de-DE");
+/** Known names for the recognizer: biasing on Android 13+ and choosing between alternatives. */
+const speechHints = computed(() => {
+  const current = options.value;
+  if (!current) return [] as string[];
+  return [
+    ...current.teachers.map((item) => item.displayName),
+    ...current.lessonTypes.map((item) => item.name),
+    ...current.resources.map((item) => item.name),
+    ...current.customers.map((item) => item.displayName),
+  ].filter((name) => Boolean(name && name.trim()));
+});
 const loading = ref(false);
 const saving = ref(false);
 const error = ref("");
@@ -210,7 +219,13 @@ function collectSpoken(event: WebSpeechRecognitionEvent): { finalText: string; i
   let interimText = "";
   for (let i = 0; i < event.results.length; i += 1) {
     const result = event.results[i];
-    const transcript = (result[0]?.transcript ?? "").replace(/\s+/g, " ").trim();
+    if (!result) continue;
+    const alternatives: string[] = [];
+    for (let j = 0; j < (result.length || 1); j += 1) {
+      const alternative = result[j]?.transcript;
+      if (alternative) alternatives.push(alternative);
+    }
+    const transcript = pickTranscript(alternatives[0] ?? "", alternatives.slice(1), speechHints.value);
     if (!transcript) continue;
     if (result.isFinal) finalText = commitUtterance(finalText, transcript);
     else interimText = transcript;
@@ -291,7 +306,7 @@ function setupSpeech() {
   }
   speechSupported.value = true;
   recognition = new Ctor();
-  recognition.lang = "de-DE";
+  recognition.lang = speechLanguage.value;
   recognition.continuous = true;
   recognition.interimResults = true;
   recognition.maxAlternatives = 3;
@@ -359,6 +374,7 @@ async function toggleSpeech() {
   speechInterim.value = "";
   speechStopping = false;
   clearSpeechRestart();
+  if (recognition) recognition.lang = speechLanguage.value;
   if (isNativeAndroidSpeech()) {
     try {
       stopNativeSpeech = await startNativeSpeech({
@@ -379,7 +395,7 @@ async function toggleSpeech() {
         onError: (message) => {
           speechError.value = message;
         },
-      });
+      }, { lang: speechLanguage.value, hints: speechHints.value });
       speechListening.value = true;
     } catch (e) {
       stopNativeSpeech = null;
@@ -437,17 +453,24 @@ function applyParsed(
   if (parsed.date && (!isEditing.value || !slotSuggested)) form.date = parsed.date;
   if (parsed.time && (!isEditing.value || !slotSuggested)) form.time = parsed.time;
   if (parsed.durationMinutes) form.durationMinutes = parsed.durationMinutes;
+  const parsedTeacherIds = parsed.teacherIds?.length ? parsed.teacherIds : parsed.teacherId ? [parsed.teacherId] : [];
   if (
     canPlanAllAppointments.value &&
-    parsed.teacherId &&
+    parsedTeacherIds.length &&
     (!isEditing.value || !slotSuggested || !form.teacherIds.length)
   ) {
-    setTeacherIds([parsed.teacherId], true);
+    setTeacherIds(parsedTeacherIds, true);
   }
   if (parsed.resourceId) form.resourceId = parsed.resourceId;
   if (parsed.lessonTypeId) form.lessonTypeId = parsed.lessonTypeId;
   if (parsed.phone) form.phone = parsed.phone;
   if (parsed.note) form.note = parsed.note;
+  if (parsed.status === "draft" || parsed.status === "confirmed") form.status = parsed.status;
+  if (parsed.reminderDate || parsed.reminderText) {
+    if (parsed.reminderDate) form.reminderDate = parsed.reminderDate;
+    if (parsed.reminderTime) form.reminderTime = parsed.reminderTime;
+    if (parsed.reminderText) form.reminderText = parsed.reminderText;
+  }
   if (parsed.customerId) {
     form.customerId = parsed.customerId;
     const known = options.value?.customers.find((item) => item.id === parsed.customerId);
@@ -499,13 +522,15 @@ async function parseFromText() {
       const who = typeof slot.teacherName === "string" && slot.teacherName ? ` · ${slot.teacherName}` : "";
       return ` ${t("quickCapture.parseNextSlot", { priority: Number(slot.priority) || 0, when, who })}`;
     })();
-    parseHint.value = questions.value.length
+    const hint = questions.value.length
       ? t("quickCapture.parseClarify")
       : passenger
         ? result.parsed.customerId
           ? `${t("quickCapture.parseFound", { name: passenger })}${slotHint}`
           : `${t("quickCapture.parseNewCustomer", { name: passenger })}${slotHint}`
         : `${t("quickCapture.parseNoCustomer")}${slotHint}`;
+    // Visible marker that the AI model (not the rule parser) structured the text.
+    parseHint.value = result.source === "ai" ? `${t("quickCapture.parseViaAi")} · ${hint}` : hint;
   } catch (e: unknown) {
     error.value = apiErrorMessage(e);
   } finally {
