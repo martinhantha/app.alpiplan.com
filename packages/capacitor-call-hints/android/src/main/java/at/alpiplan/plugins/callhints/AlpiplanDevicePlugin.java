@@ -212,10 +212,13 @@ public class AlpiplanDevicePlugin extends Plugin {
                         } else {
                             // Surface why FCM gave no token (SERVICE_NOT_AVAILABLE, FIS_AUTH_ERROR, ...).
                             Object exception = taskClass.getMethod("getException").invoke(completed);
-                            result.put("error", exception == null ? "no token" : String.valueOf(exception));
+                            String reason = exception == null ? "no token" : String.valueOf(exception);
+                            android.util.Log.w("AlpiplanPush", "FCM token unavailable: " + reason);
+                            result.put("error", reason);
                         }
                     } catch (Exception failure) {
                         // Resolve with the reason so the web layer can show it; in-app alerts keep working.
+                        android.util.Log.w("AlpiplanPush", "FCM token lookup failed: " + failure);
                         result.put("error", String.valueOf(failure));
                     }
                     call.resolve(result);
@@ -224,6 +227,8 @@ public class AlpiplanDevicePlugin extends Plugin {
             );
             addListener.invoke(task, listener);
         } catch (Throwable failure) {
+            // Typical in minified builds without keep rules: the reflected classes were renamed or removed.
+            android.util.Log.w("AlpiplanPush", "Firebase Messaging not reachable via reflection: " + failure);
             JSObject result = new JSObject();
             result.put("error", "Firebase Messaging not available: " + failure);
             call.resolve(result);

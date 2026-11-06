@@ -44,4 +44,18 @@ if (!rootBuild.includes("com.google.gms:google-services")) {
   writeFileSync(rootGradle, rootBuild);
 }
 
+// Belt and braces next to the plugin's consumer rules: keep the Firebase classes the
+// push plugin reaches via reflection, otherwise a minified release build gets no token.
+const proguard = resolve(root, "android/app/proguard-rules.pro");
+const keepRules = [
+  "# Alpiplan push: FirebaseMessaging is used via reflection (see capacitor-call-hints consumer-rules.pro)",
+  "-keep class com.google.firebase.messaging.FirebaseMessaging { *; }",
+  "-keep class com.google.android.gms.tasks.Task { *; }",
+  "-keep class com.google.android.gms.tasks.OnCompleteListener { *; }",
+].join("\n");
+const existingRules = existsSync(proguard) ? readFileSync(proguard, "utf8") : "";
+if (!existingRules.includes("com.google.firebase.messaging.FirebaseMessaging")) {
+  writeFileSync(proguard, `${existingRules.trimEnd()}\n\n${keepRules}\n`);
+}
+
 console.log("Patched Android Firebase Cloud Messaging for background push.");
