@@ -1,0 +1,11 @@
+{
+  "name": "Alpiplan",
+  "target": "avelom.cloud",
+  "check": "node scripts/deploy-check.mjs --json",
+  "logs": "docker --context avelom.cloud logs -f --tail 100 $(docker --context avelom.cloud ps -q --filter label=coolify.type=application --filter name=web-alpiplan- | head -1)",
+  "actions": [
+    { "id": "deploy", "label": "Deploy", "command": "pnpm deploy:fast", "primary": true, "confirm": true },
+    { "id": "migrate", "label": "Deploy + Migrationen", "command": "pnpm deploy:fast --migrate", "confirm": true },
+    { "id": "dry", "label": "Probelauf", "command": "pnpm deploy:fast --dry-run" }
+  ]
+}
